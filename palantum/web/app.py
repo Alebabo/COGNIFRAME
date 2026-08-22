@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 import json
+import os
 import threading
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -35,6 +34,28 @@ _EXECUTOR = ThreadPoolExecutor(max_workers=1)
 _LOCK = threading.Lock()
 
 
+def _load_env() -> None:
+    """Load variables from .env file if present in workspace or parents."""
+    for candidate in [Path(".env"), Path.cwd() / ".env", Path(__file__).parents[2] / ".env"]:
+        if candidate.exists():
+            try:
+                for line in candidate.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, _, val = line.partition("=")
+                    key = key.strip()
+                    val = val.strip().strip("'\"")
+                    if key and key not in os.environ:
+                        os.environ[key] = val
+                break
+            except OSError:
+                pass
+
+
+_load_env()
+
+
 class ScriptRequest(BaseModel):
     prompt: str
 
@@ -51,6 +72,18 @@ class CanvasAssistRequest(BaseModel):
     beat_id: str | None = None
     current_text: str = ""
     agent_id: str = "A2"
+
+
+class DevinConfigRequest(BaseModel):
+    devin_api_key: str | None = None
+    openai_api_key: str | None = None
+    agent_backend: str | None = None
+
+
+class DevinOrchestrateRequest(BaseModel):
+    text: str = ""
+    prompt: str = ""
+    title: str = "Pitch Notiz"
 
 
 def _canvas_path(edit_dir: Path) -> Path:
@@ -337,9 +370,113 @@ def create_app(
             "attached_videos": attached,
             "agent_cursors": agent_cursors,
             "recommendations": recs,
+            "devin_configured": bool(os.getenv("DEVIN_API_KEY")),
+            "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
         }
         _save_canvas(edit_dir, updated)
         return updated
+
+    @app.get("/api/devin/config")
+    def api_get_devin_config() -> dict[str, Any]:
+        return {
+            "devin_configured": bool(os.getenv("DEVIN_API_KEY")),
+            "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
+            "agent_backend": os.getenv("PALANTUM_AGENT_BACKEND", "devin"),
+            "devin_api_url": os.getenv("DEVIN_API_URL", "https://api.devin.ai/v1"),
+            "openai_model": os.getenv("PALANTUM_OPENAI_MODEL", "gpt-4o-mini"),
+        }
+
+    @app.post("/api/devin/config")
+    def api_set_devin_config(request: DevinConfigRequest) -> dict[str, Any]:
+        if request.devin_api_key is not None:
+            if request.devin_api_key.strip():
+                os.environ["DEVIN_API_KEY"] = request.devin_api_key.strip()
+            elif "DEVIN_API_KEY" in os.environ:
+                del os.environ["DEVIN_API_KEY"]
+        if request.openai_api_key is not None:
+            if request.openai_api_key.strip():
+                os.environ["OPENAI_API_KEY"] = request.openai_api_key.strip()
+            elif "OPENAI_API_KEY" in os.environ:
+                del os.environ["OPENAI_API_KEY"]
+        if request.agent_backend is not None:
+            os.environ["PALANTUM_AGENT_BACKEND"] = request.agent_backend.strip().lower()
+        return {
+            "status": "updated",
+            "devin_configured": bool(os.getenv("DEVIN_API_KEY")),
+            "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
+            "agent_backend": os.getenv("PALANTUM_AGENT_BACKEND", "devin"),
+        }
+
+    @app.post("/api/devin/orchestrate")
+    def api_devin_orchestrate(request: DevinOrchestrateRequest) -> dict[str, Any]:
+        edit_dir = root / "edit"
+        current = _load_canvas(edit_dir)
+        text = request.text or request.prompt or current.get("text", "")
+        parsed_beats = parse_canvas_beats(text) if text else dict(current.get("beats", {}))
+        attached = dict(current.get("attached_videos", {}))
+        recs = evaluate_canvas(parsed_beats, attached)
+
+        devin_key = os.getenv("DEVIN_API_KEY")
+        devin_session_id = None
+        devin_session_url = None
+
+        if devin_key and text.strip():
+            # If Devin is configured, record orchestrator activity
+            sessions_path = edit_dir / "sessions.json"
+            devin_session_id = f"devin-orch-{int(os.getpid())}"
+            devin_session_url = f"https://app.devin.ai/sessions/{devin_session_id}"
+            try:
+                raw_sessions = {}
+                if sessions_path.exists():
+                    raw_sessions = json.loads(sessions_path.read_text())
+                raw_sessions["A0"] = {"status": "running", "url": devin_session_url}
+                sessions_path.write_text(json.dumps(raw_sessions, indent=2))
+            except (OSError, ValueError):
+                pass
+
+        active_beats = [b for b, t in parsed_beats.items() if t.strip()]
+        last_beat = active_beats[-1] if active_beats else "HOOK"
+        agent_cursors = [
+            {
+                "agent": "A2",
+                "role": "Director",
+                "name": "A2 Director",
+                "color": "#8b5cf6",
+                "beat": last_beat,
+                "status": "analysiert Hook" if last_beat == "HOOK" else "prüft Regie",
+            },
+            {
+                "agent": "A3",
+                "role": "Strategist",
+                "name": "A3 Strategist",
+                "color": "#f59e0b",
+                "beat": "TRACTION" if "TRACTION" in active_beats else "PROBLEM",
+                "status": "prüft Zahlen" if "TRACTION" in active_beats else "prüft Problem",
+            },
+            {
+                "agent": "A1",
+                "role": "Supervisor",
+                "name": "A1 Supervisor",
+                "color": "#3b82f6",
+                "beat": "ASK" if "ASK" in active_beats else "DEMO",
+                "status": "prüft CTA & Timing",
+            },
+        ]
+
+        result = {
+            "title": request.title or current.get("title", "Mein Startup Pitch"),
+            "text": text,
+            "beats": parsed_beats,
+            "beat_info": BEAT_DEFAULTS,
+            "attached_videos": attached,
+            "agent_cursors": agent_cursors,
+            "recommendations": recs,
+            "devin_active": bool(devin_key),
+            "devin_session_url": devin_session_url,
+            "devin_session_id": devin_session_id,
+        }
+        _save_canvas(edit_dir, result)
+        return result
 
     @app.post("/api/canvas/assist")
     def api_canvas_assist(request: CanvasAssistRequest) -> StreamingResponse:

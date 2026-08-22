@@ -108,7 +108,7 @@ def evaluate_canvas(
     recs: list[dict[str, Any]] = []
     attached = attached_videos or {}
 
-    # Check HOOK
+    # 1. Check HOOK
     hook = beats.get("HOOK", "").strip()
     if not hook:
         recs.append({
@@ -117,8 +117,10 @@ def evaluate_canvas(
             "role": "Director",
             "beat": "HOOK",
             "type": "missing",
-            "message": "Der Hook fehlt noch. Starte mit einer starken, überraschenden These.",
-            "suggestion": "Formuliere den ersten Satz so, dass ein Fremder sofort hinhört.",
+            "missing_item": "Hook & Nutzenversprechen",
+            "message": "Der Hook fehlt noch. Starte mit einer starken These.",
+            "ghost_text": "Zwei Stunden Fehlersuche werden zu zwei Minuten.",
+            "target_pattern": "",
         })
     elif any(g in hook.lower() for g in ["hallo", "hi ", "herzlich willkommen", "mein name ist"]):
         clean_hook = re.sub(
@@ -126,18 +128,21 @@ def evaluate_canvas(
             "",
             hook,
             flags=re.IGNORECASE,
-        ).strip().capitalize()
+        ).strip()
+        first_cap = clean_hook.capitalize() if clean_hook else "Wir automatisieren den Ablauf."
         recs.append({
             "id": "rec-hook-greeting",
             "agent": "A3",
             "role": "Strategist",
             "beat": "HOOK",
-            "type": "weak",
+            "type": "missing",
+            "missing_item": "Direkter Nutzenstart ohne Floskeln",
             "message": "Begrüßungen in den ersten 2s kosten Zuschauer. Starte mit dem Nutzen.",
-            "suggestion": clean_hook,
+            "ghost_text": first_cap,
+            "target_pattern": r"^(hallo|hi|herzlich willkommen[,\s]*|mein name ist[^\.]*\.)\s*",
         })
 
-    # Check PROBLEM
+    # 2. Check PROBLEM
     problem = beats.get("PROBLEM", "").strip()
     if not problem:
         recs.append({
@@ -146,21 +151,25 @@ def evaluate_canvas(
             "role": "Director",
             "beat": "PROBLEM",
             "type": "missing",
+            "missing_item": "Konkreter Schmerzpunkt",
             "message": "Definiere das konkrete Problem: Wer verliert Zeit oder Geld?",
-            "suggestion": "Entwickler/Kunden verlieren X Stunden pro Woche, weil...",
+            "ghost_text": "Entwickler verlieren täglich wertvolle Zeit durch manuelle Schritte.",
+            "target_pattern": "",
         })
-    elif len(problem.split()) < 5:
+    elif len(problem.split()) < 4:
         recs.append({
             "id": "rec-problem-short",
             "agent": "A3",
             "role": "Strategist",
             "beat": "PROBLEM",
-            "type": "weak",
+            "type": "missing",
+            "missing_item": "Präzisierung des Schmerzpunkts",
             "message": "Das Problem ist noch abstrakt. Benenne den Schmerzpunkt präziser.",
-            "suggestion": None,
+            "ghost_text": f"{problem} – wodurch Teams jede Woche Stunden verlieren.",
+            "target_pattern": problem,
         })
 
-    # Check SOLUTION
+    # 3. Check SOLUTION
     solution = beats.get("SOLUTION", "").strip()
     if not solution:
         recs.append({
@@ -169,11 +178,13 @@ def evaluate_canvas(
             "role": "Director",
             "beat": "SOLUTION",
             "type": "missing",
+            "missing_item": "Lösungsmechanismus",
             "message": "Erkläre den Mechanismus deiner Lösung (nicht nur Adjektive).",
-            "suggestion": "Unsere Technologie macht X durch Y automatisch...",
+            "ghost_text": "Unsere Technologie isoliert die Fehlerursache automatisch in Echtzeit.",
+            "target_pattern": "",
         })
 
-    # Check DEMO
+    # 4. Check DEMO
     has_demo_video = bool(attached.get("DEMO"))
     if not has_demo_video:
         recs.append({
@@ -181,35 +192,41 @@ def evaluate_canvas(
             "agent": "A2",
             "role": "Director",
             "beat": "DEMO",
-            "type": "action",
+            "type": "missing",
+            "missing_item": "Visuelles Demo-Material",
             "message": "Für DEMO wird visuelles Produktmaterial benötigt (Screen-Recording).",
-            "suggestion": "Heffte ein kurzes Video oder UI-Recording direkt an diesen Beat an.",
+            "ghost_text": "[Hier Screen-Recording oder UI-Demo anhängen]",
+            "target_pattern": "",
         })
 
-    # Check TRACTION
+    # 5. Check TRACTION
     traction = beats.get("TRACTION", "").strip()
-    if traction and not re.search(r"\d+", traction):
+    if not traction or not re.search(r"\d+", traction):
         recs.append({
             "id": "rec-trac-numbers",
             "agent": "A3",
             "role": "Strategist",
             "beat": "TRACTION",
-            "type": "weak",
+            "type": "missing",
+            "missing_item": "Harte Kennzahlen & Traction",
             "message": "Traction ohne Zahlen wirkt schwach. Nenne messbare Nutzerzahlen.",
-            "suggestion": "In den letzten [X] Monaten haben [Y] Kunden unser Produkt genutzt.",
+            "ghost_text": "Über 100 Teams nutzen die Lösung bereits produktiv im Alltag.",
+            "target_pattern": "",
         })
 
-    # Check ASK
+    # 6. Check ASK
     ask = beats.get("ASK", "").strip()
     if not ask:
         recs.append({
             "id": "rec-ask-missing",
-            "agent": "A2",
-            "role": "Director",
+            "agent": "A1",
+            "role": "Supervisor",
             "beat": "ASK",
             "type": "missing",
+            "missing_item": "Call to Action (CTA)",
             "message": "Schließe mit einem klaren Call to Action ab.",
-            "suggestion": "Besuche [Website] und teste die Beta noch heute.",
+            "ghost_text": "Teste die Beta jetzt kostenlos auf unserer Website.",
+            "target_pattern": "",
         })
 
     return recs
@@ -293,8 +310,23 @@ def create_agent_assist_stream(
     )
 
     if not api_key:
-        default_resp = f"[{agent_id} Vorschlag]: Präzisiere '{beat_id or 'deinen Pitch'}'."
-        return _word_chunks(default_resp), "local"
+        # Dynamic contextual fallback without generic placeholder
+        if beat_id == "HOOK" or "hallo" in current_text.lower():
+            clean = re.sub(
+                r"^(hallo|hi|herzlich willkommen[,\s]*|mein name ist[^\.]*\.)\s*",
+                "",
+                current_text,
+                flags=re.IGNORECASE,
+            ).strip()
+            capitalized = clean.capitalize() or "Zwei Stunden werden zu zwei Minuten."
+            dynamic = f"Starte direkt: '{capitalized}'"
+        elif beat_id == "TRACTION" or not re.search(r"\d+", current_text):
+            dynamic = "Ergänze konkrete Kennzahlen: 'Über 100 Teams nutzen die Lösung produktiv.'"
+        elif beat_id == "ASK":
+            dynamic = "Schließe mit klarem Call-to-Action: 'Teste die Beta jetzt kostenlos.'"
+        else:
+            dynamic = "Präzisiere den konkreten Mehrwert und nenne die Zielgruppe direkt."
+        return _word_chunks(dynamic), "local"
 
     try:
         from openai import OpenAI
@@ -319,6 +351,6 @@ def create_agent_assist_stream(
 
         return chunks(), "openai"
     except Exception:
-        default_resp = f"[{agent_id}]: Formuliere diesen Beat klarer und streiche Füllwörter."
-        return _word_chunks(default_resp), "local"
+        dynamic = "Formuliere den Nutzen präzise in einem aktiven Satz."
+        return _word_chunks(dynamic), "local"
 

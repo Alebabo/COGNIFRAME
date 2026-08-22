@@ -100,7 +100,7 @@
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    width: 290px;
+    width: 310px;
     background: #ffffff;
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -130,12 +130,14 @@
     align-items: center;
   }
   .orchestrator-tag {
-    font-size: 9px;
-    padding: 1px 5px;
-    border-radius: 3px;
-    background: var(--soft);
-    border: 1px solid var(--border);
-    color: var(--ink);
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    font-weight: 500;
+    cursor: pointer;
   }
   .agent-row {
     display: flex;
@@ -171,6 +173,21 @@
     margin-top: 1px;
     line-height: 1.35;
   }
+  .devin-cfg-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    background: var(--soft);
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink);
+    cursor: pointer;
+    text-align: center;
+    transition: background 150ms ease;
+  }
+  .devin-cfg-btn:hover { background: #eaeaea; }
 
   /* Main Writing Surface / Canvas */
   main {
@@ -183,7 +200,54 @@
     position: relative;
     width: 100%;
   }
+
+  /* In-Canvas Ghost-Text Backdrop */
+  .ghost-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    font-family: inherit;
+    font-size: 24px;
+    line-height: 1.55;
+    letter-spacing: -0.015em;
+    color: transparent;
+    pointer-events: none;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+    user-select: none;
+  }
+  .ghost-match-text {
+    color: transparent;
+  }
+  .ghost-suggested-text {
+    color: var(--ghost);
+    font-style: italic;
+    opacity: 0.85;
+    transition: opacity 180ms ease;
+  }
+  .ghost-tab-hint {
+    display: inline-block;
+    font-style: normal;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: #f3f4f6;
+    color: #6b7280;
+    border: 1px solid #e5e7eb;
+    border-radius: 3px;
+    padding: 1px 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
   .prompt {
+    position: relative;
     width: 100%;
     min-height: 240px;
     border: none;
@@ -197,6 +261,7 @@
     padding: 0;
     margin: 0;
     letter-spacing: -0.015em;
+    z-index: 2;
   }
   .prompt::placeholder {
     color: #c4c6cb;
@@ -212,6 +277,7 @@
     height: 100%;
     pointer-events: none;
     overflow: visible;
+    z-index: 10;
   }
   .agent-cursor {
     position: absolute;
@@ -255,80 +321,65 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.12);
   }
 
-  /* Floating Suggestion & Incentive Box */
-  .cursor-bubble {
+  /* Compact Dismissable Missing Content Badge */
+  .cursor-badge {
     margin-top: 6px;
-    padding: 10px 12px;
-    background: #ffffff;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 12px;
-    color: var(--ink);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
-    max-width: 280px;
-    line-height: 1.45;
-    z-index: 30;
-    animation: popIn 220ms ease both;
-  }
-  @keyframes popIn {
-    from { opacity: 0; transform: translateY(6px) scale(0.96); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-  }
-  .bubble-incentive {
-    color: #4b5563;
-    margin-bottom: 6px;
-    font-size: 12px;
-  }
-  .bubble-ghost-preview {
-    font-style: italic;
-    color: var(--ghost);
-    background: #f9fafb;
-    padding: 4px 8px;
-    border-radius: 4px;
-    border-left: 2px solid currentColor;
-    margin-bottom: 8px;
-    font-size: 12px;
-    word-break: break-word;
-  }
-  .bubble-actions {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
-  }
-  .bubble-btn {
-    border: none;
-    background: var(--ink);
-    color: #ffffff;
-    padding: 3px 8px;
-    border-radius: 4px;
+    padding: 4px 10px;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 16px;
     font-size: 11px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: opacity 150ms ease;
+    color: var(--ink);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    max-width: 290px;
+    white-space: nowrap;
+    animation: popIn 200ms ease both;
+    cursor: default;
+    user-select: none;
   }
-  .bubble-btn:hover { opacity: 0.88; }
-  .bubble-dismiss {
+  @keyframes popIn {
+    from { opacity: 0; transform: translateY(4px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .badge-icon {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .badge-text {
+    font-weight: 500;
+    color: #374151;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .badge-dismiss {
     border: none;
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 14px;
+    line-height: 1;
     cursor: pointer;
-    padding: 0;
+    padding: 0 2px;
+    margin-left: 2px;
   }
-  .bubble-dismiss:hover { color: var(--ink); }
+  .badge-dismiss:hover { color: var(--ink); }
 
   /* Specific Agent Cursor Themes */
   .agent-cursor.director .cursor-caret { background: var(--director); }
   .agent-cursor.director .cursor-tag { background: var(--director); }
-  .agent-cursor.director .bubble-ghost-preview { border-left-color: var(--director); color: #7c3aed; background: #f5f3ff; }
+  .agent-cursor.director .badge-icon { background: var(--director); }
 
   .agent-cursor.strategist .cursor-caret { background: var(--strategist); }
   .agent-cursor.strategist .cursor-tag { background: var(--strategist); }
-  .agent-cursor.strategist .bubble-ghost-preview { border-left-color: var(--strategist); color: #d97706; background: #fffbeb; }
+  .agent-cursor.strategist .badge-icon { background: var(--strategist); }
 
   .agent-cursor.supervisor .cursor-caret { background: var(--supervisor); }
   .agent-cursor.supervisor .cursor-tag { background: var(--supervisor); }
-  .agent-cursor.supervisor .bubble-ghost-preview { border-left-color: var(--supervisor); color: #2563eb; background: #eff6ff; }
+  .agent-cursor.supervisor .badge-icon { background: var(--supervisor); }
 
   /* Offscreen Mirror for coordinate calculation */
   #mirror {
@@ -616,10 +667,68 @@
     pointer-events: none;
   }
 
+  /* Modal for Devin Config */
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+  }
+  .modal-card {
+    width: min(100% - 32px, 440px);
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+  }
+  .modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+  .modal-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    font-family: inherit;
+    outline: none;
+  }
+  .modal-input:focus { border-color: var(--ink); }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .modal-btn {
+    padding: 8px 14px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: #ffffff;
+  }
+  .modal-btn.primary-btn {
+    background: var(--ink);
+    color: #ffffff;
+    border-color: var(--ink);
+  }
+
   @media (max-width: 680px) {
     .topbar { padding: 0 16px; }
     main { width: calc(100% - 32px); padding-top: 96px; }
-    .prompt { font-size: 20px; }
+    .prompt, .ghost-backdrop { font-size: 20px; }
     .toolbar { padding: 0 16px; }
     .actions { grid-template-columns: repeat(2, 1fr); }
   }
@@ -638,7 +747,7 @@
     <div class="agents-tooltip" id="agents-tooltip">
       <div class="agents-tooltip-title">
         <span>Devin Orchestrator</span>
-        <span class="orchestrator-tag" id="orchestrator-status">Online</span>
+        <span class="orchestrator-tag" id="orchestrator-status">Bereit</span>
       </div>
       <div class="agent-row">
         <div class="agent-row-dot" style="background: var(--director);"></div>
@@ -661,12 +770,18 @@
           <div class="agent-row-role">Script-Struktur, Wortgrenzen & Beat-Kopplung</div>
         </div>
       </div>
+      <button type="button" class="devin-cfg-btn" id="open-config-btn">API-Schlüssel einrichten</button>
     </div>
   </div>
 </header>
 
 <main>
   <div class="canvas-wrapper">
+    <!-- Synchronized In-Canvas Ghost Text Layer -->
+    <div id="ghost-backdrop" class="ghost-backdrop" aria-hidden="true">
+      <span id="ghost-typed" class="ghost-match-text"></span><span id="ghost-preview" class="ghost-suggested-text"></span><span id="ghost-hint" class="ghost-tab-hint" hidden>Tab</span>
+    </div>
+
     <textarea id="prompt" class="prompt" aria-label="Beschreibe dein Video" placeholder="Was möchtest du erzählen? Schreibe frei drauflos..."></textarea>
     
     <!-- Collaborative Dynamic Cursors Layer -->
@@ -674,17 +789,29 @@
       <div id="cursor-director" class="agent-cursor director">
         <div class="cursor-caret"></div>
         <span class="cursor-tag">Director</span>
-        <div id="bubble-director" class="cursor-bubble" hidden></div>
+        <div id="badge-director" class="cursor-badge" hidden>
+          <span class="badge-icon"></span>
+          <span class="badge-text" id="badgetext-director"></span>
+          <button type="button" class="badge-dismiss" onclick="dismissMissing('director')">×</button>
+        </div>
       </div>
       <div id="cursor-strategist" class="agent-cursor strategist">
         <div class="cursor-caret"></div>
         <span class="cursor-tag">Strategist</span>
-        <div id="bubble-strategist" class="cursor-bubble" hidden></div>
+        <div id="badge-strategist" class="cursor-badge" hidden>
+          <span class="badge-icon"></span>
+          <span class="badge-text" id="badgetext-strategist"></span>
+          <button type="button" class="badge-dismiss" onclick="dismissMissing('strategist')">×</button>
+        </div>
       </div>
       <div id="cursor-supervisor" class="agent-cursor supervisor">
         <div class="cursor-caret"></div>
         <span class="cursor-tag">Supervisor</span>
-        <div id="bubble-supervisor" class="cursor-bubble" hidden></div>
+        <div id="badge-supervisor" class="cursor-badge" hidden>
+          <span class="badge-icon"></span>
+          <span class="badge-text" id="badgetext-supervisor"></span>
+          <button type="button" class="badge-dismiss" onclick="dismissMissing('supervisor')">×</button>
+        </div>
       </div>
     </div>
   </div>
@@ -727,6 +854,21 @@
   </section>
 </main>
 
+<!-- API Key Configuration Modal -->
+<div id="config-modal" class="modal-backdrop" hidden>
+  <div class="modal-card">
+    <h3 class="modal-title">API-Schlüssel konfigurieren</h3>
+    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Devin AI API Key (Master-Orchestrator)</label>
+    <input type="password" id="cfg-devin-key" class="modal-input" placeholder="devin_api_...">
+    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">OpenAI API Key (LLM-Streaming)</label>
+    <input type="password" id="cfg-openai-key" class="modal-input" placeholder="sk-...">
+    <div class="modal-actions">
+      <button type="button" class="modal-btn" id="close-config-btn">Abbrechen</button>
+      <button type="button" class="modal-btn primary-btn" id="save-config-btn">Speichern & Prüfen</button>
+    </div>
+  </div>
+</div>
+
 <div id="mirror"></div>
 <img class="corner-logo" src="palantum-logo.png" alt="Palantum">
 
@@ -761,12 +903,18 @@ const state = {
   typingTimeout: null,
   assistDebounce: null,
   dismissed: {},
+  currentGhostSuggestion: '',
+  ghostTargetPattern: '',
 };
 
-// Autosize textarea
+// Autosize textarea & sync backdrop
 function autosize(el) {
   el.style.height = 'auto';
-  el.style.height = `${Math.max(el.id === 'prompt' ? 220 : 280, el.scrollHeight)}px`;
+  const newHeight = `${Math.max(el.id === 'prompt' ? 220 : 280, el.scrollHeight)}px`;
+  el.style.height = newHeight;
+  if (el.id === 'prompt') {
+    $('ghost-backdrop').style.height = newHeight;
+  }
   updateMirrorDimensions();
 }
 
@@ -804,20 +952,53 @@ function getWordCoordinates(charIndex) {
   };
 }
 
-// Apply text replacement or insertion directly into prompt
-function applyTextChange(targetPattern, replacementText) {
-  const prompt = $('prompt');
-  let current = prompt.value;
-  if (typeof targetPattern === 'string' && targetPattern && current.includes(targetPattern)) {
-    prompt.value = current.replace(targetPattern, replacementText);
-  } else if (targetPattern instanceof RegExp && targetPattern.test(current)) {
-    prompt.value = current.replace(targetPattern, replacementText);
+// In-Canvas Ghost-Text rendering
+function setGhostText(suggestion, targetPattern = '') {
+  const text = $('prompt').value;
+  state.currentGhostSuggestion = suggestion || '';
+  state.ghostTargetPattern = targetPattern || '';
+
+  $('ghost-typed').textContent = text;
+  if (suggestion && text.trim().length >= 15) {
+    $('ghost-preview').textContent = ` ${suggestion}`;
+    $('ghost-hint').hidden = false;
   } else {
-    prompt.value = current.trim() ? `${current.trim()} ${replacementText}` : replacementText;
+    $('ghost-preview').textContent = '';
+    $('ghost-hint').hidden = true;
   }
+}
+
+// Commit ghost text into canvas prompt
+function acceptGhostText() {
+  if (!state.currentGhostSuggestion) return false;
+  const prompt = $('prompt');
+  const text = prompt.value;
+  const suggestion = state.currentGhostSuggestion;
+
+  if (state.ghostTargetPattern) {
+    const reg = new RegExp(state.ghostTargetPattern, 'i');
+    if (reg.test(text)) {
+      prompt.value = text.replace(reg, suggestion);
+    } else {
+      prompt.value = text.trim() ? `${text.trim()} ${suggestion}` : suggestion;
+    }
+  } else {
+    prompt.value = text.trim() ? `${text.trim()} ${suggestion}` : suggestion;
+  }
+
+  setGhostText('');
   updateComposer(true);
   prompt.focus();
+  return true;
 }
+
+// Handle Tab key for ghost text completion
+$('prompt').addEventListener('keydown', event => {
+  if (event.key === 'Tab' && state.currentGhostSuggestion) {
+    event.preventDefault();
+    acceptGhostText();
+  }
+});
 
 // Natural Agent Cursors positioning & Devin Orchestrator query
 function updateAgentCursors() {
@@ -838,6 +1019,7 @@ function updateAgentCursors() {
     if (sDirector) sDirector.textContent = 'bereit';
     if (sStrategist) sStrategist.textContent = 'bereit';
     if (sSupervisor) sSupervisor.textContent = 'bereit';
+    setGhostText('');
     return;
   }
 
@@ -845,14 +1027,14 @@ function updateAgentCursors() {
 
   const sentences = text.split(/(?<=[.?!])\s+/).filter(Boolean);
 
-  // 1. Director: Appears as soon as the opening / hook is formed (>= 20 chars)
+  // 1. Director: Appears when opening hook is formed (>= 20 chars)
   const firstSentenceEnd = text.indexOf('.') !== -1 ? text.indexOf('.') : Math.min(35, text.length);
   const posDirector = getWordCoordinates(firstSentenceEnd);
   cDirector.style.transform = `translate(${posDirector.left}px, ${posDirector.top}px)`;
   cDirector.classList.add('visible');
   if (sDirector) sDirector.textContent = 'analysiert Hook';
 
-  // 2. Strategist: Appears when text expands to problem / metrics (>= 60 chars or 2nd sentence)
+  // 2. Strategist: Appears when text reaches problem / metrics (>= 60 chars)
   if (text.length >= 60) {
     let stratChar = Math.floor(text.length * 0.5);
     const numMatch = text.search(/\d+/);
@@ -870,7 +1052,7 @@ function updateAgentCursors() {
     if (sStrategist) sStrategist.textContent = 'bereit';
   }
 
-  // 3. Supervisor: Appears when pitch reaches call to action / structure (>= 120 chars)
+  // 3. Supervisor: Appears when pitch reaches CTA / structure (>= 120 chars)
   if (text.length >= 120) {
     let superChar = text.length;
     if (sentences.length > 2) {
@@ -885,102 +1067,78 @@ function updateAgentCursors() {
     if (sSupervisor) sSupervisor.textContent = 'bereit';
   }
 
-  // Evaluate text for live agent suggestions & ghost text
+  // Evaluate text for missing items & in-canvas ghost text
   evaluateLiveAgentHints(text);
 }
 
 function evaluateLiveAgentHints(text) {
-  const bDirector = $('bubble-director');
-  const bStrategist = $('bubble-strategist');
-  const bSupervisor = $('bubble-supervisor');
-  const lower = text.toLowerCase();
+  const bDirector = $('badge-director');
+  const bStrategist = $('badge-strategist');
+  const bSupervisor = $('badge-supervisor');
 
-  // 1. Director (Regie, Hook, Cuts)
+  const btDirector = $('badgetext-director');
+  const btStrategist = $('badgetext-strategist');
+  const btSupervisor = $('badgetext-supervisor');
+
+  const lower = text.toLowerCase();
+  let primaryGhost = '';
+  let primaryPattern = '';
+
+  // 1. Director (Hook & Greeting check)
   if (!state.dismissed['director']) {
     const greetingMatch = text.match(/^(hallo|hi |herzlich willkommen[,\s]*|mein name ist[^\.]*\.)\s*/i);
     if (greetingMatch) {
-      const cleanSuggestion = text.replace(greetingMatch[0], '').trim();
-      const firstCap = cleanSuggestion.charAt(0).toUpperCase() + cleanSuggestion.slice(1);
-      bDirector.innerHTML = `
-        <div class="bubble-incentive"><strong>Director:</strong> Begrüßungen in den ersten 2s kosten Zuschauer. Starte direkt mit dem Nutzen.</div>
-        <div class="bubble-ghost-preview">"${firstCap.substring(0, 50)}…"</div>
-        <div class="bubble-actions">
-          <button type="button" class="bubble-btn" onclick="applyTextChange(/^${greetingMatch[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/i, '')">Begrüßung streichen</button>
-          <button type="button" class="bubble-dismiss" onclick="dismissHint('director')">×</button>
-        </div>`;
+      const clean = text.replace(greetingMatch[0], '').trim();
+      const firstCap = clean ? (clean.charAt(0).toUpperCase() + clean.slice(1)) : 'Wir lösen das Problem für Teams.';
+      btDirector.textContent = 'Nutzenversprechen ohne Begrüßung';
       bDirector.hidden = false;
+      primaryGhost = firstCap;
+      primaryPattern = `^${greetingMatch[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
     } else if (text.length > 30 && !lower.includes('?') && !lower.includes('wie') && !lower.includes('warum')) {
-      bDirector.innerHTML = `
-        <div class="bubble-incentive"><strong>Director:</strong> Eine Einstiegsfrage steigert die Retention um 35%.</div>
-        <div class="bubble-ghost-preview">"Kennst du das Problem…?"</div>
-        <div class="bubble-actions">
-          <button type="button" class="bubble-btn" onclick="applyTextChange('', 'Kennst du das Problem?')">Frage einfügen</button>
-          <button type="button" class="bubble-dismiss" onclick="dismissHint('director')">×</button>
-        </div>`;
+      btDirector.textContent = 'Einstiegsfrage fehlt';
       bDirector.hidden = false;
+      if (!primaryGhost) primaryGhost = 'Kennst du das Problem, wenn Tests fehlschlagen?';
     } else {
       bDirector.hidden = true;
     }
   }
 
-  // 2. Strategist (Pitch-Story, Hard Facts, Numbers)
+  // 2. Strategist (Missing KPI / Metrics check)
   if (!state.dismissed['strategist'] && text.length >= 60) {
     if (!/\d+/.test(text)) {
-      bStrategist.innerHTML = `
-        <div class="bubble-incentive"><strong>Strategist:</strong> Mache dein Versprechen messbar – wie viel Zeit oder Geld wird gespart?</div>
-        <div class="bubble-ghost-preview">"…in 2 Minuten statt 2 Stunden"</div>
-        <div class="bubble-actions">
-          <button type="button" class="bubble-btn" onclick="applyTextChange('', 'In nur 2 Minuten statt 2 Stunden.')">Zahl ergänzen</button>
-          <button type="button" class="bubble-dismiss" onclick="dismissHint('strategist')">×</button>
-        </div>`;
+      btStrategist.textContent = 'Harte Kennzahlen (KPIs) fehlen';
       bStrategist.hidden = false;
+      if (!primaryGhost) primaryGhost = 'In nur 2 Minuten statt 2 Stunden.';
     } else {
-      bStrategist.innerHTML = `
-        <div class="bubble-incentive"><strong>Strategist:</strong> Starke Faktenbasis! Benenne noch die Zielgruppe.</div>
-        <div class="bubble-ghost-preview">"Für Entwickler & Gründer…"</div>
-        <div class="bubble-actions">
-          <button type="button" class="bubble-btn" onclick="applyTextChange('', 'speziell für Teams und Entwickler.')">Zielgruppe ergänzen</button>
-          <button type="button" class="bubble-dismiss" onclick="dismissHint('strategist')">×</button>
-        </div>`;
-      bStrategist.hidden = false;
+      bStrategist.hidden = true;
     }
   } else {
     bStrategist.hidden = true;
   }
 
-  // 3. Supervisor (Struktur, Wortgrenzen, CTA)
+  // 3. Supervisor (Missing CTA check)
   if (!state.dismissed['supervisor'] && text.length >= 120) {
-    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-    const hasCta = /\b(teste|besuche|link|klick|jetzt|start|beta|download|app)\b/i.test(text);
-
+    const hasCta = /\b(teste|besuche|link|klick|jetzt|start|beta|download|app|kontakt)\b/i.test(text);
     if (!hasCta) {
-      bSupervisor.innerHTML = `
-        <div class="bubble-incentive"><strong>Supervisor:</strong> Call to Action fehlt. Was sollen Zuschauer als Nächstes tun?</div>
-        <div class="bubble-ghost-preview">"Teste die Beta jetzt kostenlos."</div>
-        <div class="bubble-actions">
-          <button type="button" class="bubble-btn" onclick="applyTextChange('', 'Teste die Beta jetzt kostenlos auf palantum.dev.')">CTA einfügen</button>
-          <button type="button" class="bubble-dismiss" onclick="dismissHint('supervisor')">×</button>
-        </div>`;
+      btSupervisor.textContent = 'Call to Action (CTA) fehlt';
       bSupervisor.hidden = false;
-    } else if (wordCount > 50) {
-      bSupervisor.innerHTML = `
-        <div class="bubble-incentive"><strong>Supervisor:</strong> ${wordCount} Wörter (~${Math.round(wordCount / 2.3)}s). Ideale Länge für 60s Video.</div>
-        <div class="bubble-actions">
-          <button type="button" class="bubble-dismiss" onclick="dismissHint('supervisor')">Verstanden</button>
-        </div>`;
-      bSupervisor.hidden = false;
+      if (!primaryGhost) primaryGhost = 'Teste die Beta noch heute kostenlos auf palantum.dev.';
     } else {
       bSupervisor.hidden = true;
     }
   } else {
     bSupervisor.hidden = true;
   }
+
+  // Set in-canvas ghost text preview
+  setGhostText(primaryGhost, primaryPattern);
 }
 
-function dismissHint(agentId) {
+function dismissMissing(agentId) {
   state.dismissed[agentId] = true;
-  const bubble = $(`bubble-${agentId}`);
-  if (bubble) bubble.hidden = true;
+  const badge = $(`badge-${agentId}`);
+  if (badge) badge.hidden = true;
+  setGhostText('');
 }
 
 function completeness(text) {
@@ -1001,7 +1159,7 @@ function updateComposer(immediate = false) {
   $('generate').disabled = !check.complete || state.generating;
   $('create-video').hidden = $('script-result').hidden || state.uploading;
 
-  // React naturally only when user finishes words/pauses typing
+  // React naturally when user pauses typing
   clearTimeout(state.typingTimeout);
   if (immediate) {
     updateAgentCursors();
@@ -1011,26 +1169,25 @@ function updateComposer(immediate = false) {
 
   // Background debounced assist query
   clearTimeout(state.assistDebounce);
-  state.assistDebounce = setTimeout(syncWithBackendAssist, 1000);
+  state.assistDebounce = setTimeout(syncWithBackendOrchestrator, 900);
 }
 
-async function syncWithBackendAssist() {
+async function syncWithBackendOrchestrator() {
   const prompt = $('prompt').value.trim();
   if (prompt.length < 15) return;
   try {
-    const res = await fetch('/api/canvas', {
+    const res = await fetch('/api/devin/orchestrate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: 'Pitch Notiz',
-        text: prompt,
-        beats: { HOOK: prompt.substring(0, 80) },
-      }),
+      body: JSON.stringify({ text: prompt }),
     });
     if (res.ok) {
       const data = await res.json();
-      if (data.devin_status) {
-        $('orchestrator-status').textContent = data.devin_status;
+      if (data.devin_active) {
+        $('orchestrator-status').textContent = 'Aktiv (Devin)';
+        $('orchestrator-status').style.background = '#dcfce7';
+      } else {
+        $('orchestrator-status').textContent = 'Bereit';
       }
     }
   } catch (_) {}
@@ -1216,6 +1373,44 @@ function startDictation() {
   $('mic').classList.add('listening');
   recognition.start();
 }
+
+// API Config Modal handlers
+$('open-config-btn').addEventListener('click', async () => {
+  try {
+    const res = await fetch('/api/devin/config');
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg.devin_configured) $('cfg-devin-key').placeholder = '•••••••••••• (Bereits konfiguriert)';
+      if (cfg.openai_configured) $('cfg-openai-key').placeholder = '•••••••••••• (Bereits konfiguriert)';
+    }
+  } catch (_) {}
+  $('config-modal').hidden = false;
+});
+$('close-config-btn').addEventListener('click', () => $('config-modal').hidden = true);
+$('save-config-btn').addEventListener('click', async () => {
+  const devinKey = $('cfg-devin-key').value.trim();
+  const openaiKey = $('cfg-openai-key').value.trim();
+  try {
+    const res = await fetch('/api/devin/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        devin_api_key: devinKey || undefined,
+        openai_api_key: openaiKey || undefined,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.devin_configured) {
+        $('orchestrator-status').textContent = 'Aktiv (Devin)';
+        $('orchestrator-status').style.background = '#dcfce7';
+      }
+      $('config-modal').hidden = true;
+    }
+  } catch (err) {
+    alert('Fehler beim Speichern der Konfiguration: ' + err.message);
+  }
+});
 
 $('prompt').addEventListener('input', () => updateComposer(false));
 $('script-output').addEventListener('input', () => autosize($('script-output')));
