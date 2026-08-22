@@ -68,7 +68,9 @@ def state_payload(videos_dir: Path) -> dict[str, Any]:
     edit_dir = videos_dir / "edit"
     state = load(edit_dir, _schema())
     sources = state.get("meta", {}).get("sources", [])
-    has_sources = bool(sources) or any(videos_dir.glob(pattern) for pattern in ("*.mp4", "*.mov"))
+    has_sources = bool(sources) or any(
+        next(videos_dir.glob(pattern), None) is not None for pattern in ("*.mp4", "*.mov")
+    )
     final = edit_dir / "final.mp4"
     if not has_sources:
         phase = "empty"

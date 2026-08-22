@@ -186,7 +186,8 @@ function apply(state) {
   renderNotes(state.notes);
   renderCrew(state.sessions);
   if (state.phase === 'done' && state.video_url && !directing) {
-    $('player').src = state.video_url;
+    const player = $('player');
+    if (!player.src.endsWith(state.video_url)) player.src = state.video_url;
     $('dl-video').href = state.video_url;
     $('dl-project').href = state.export_url;
     show('done');
