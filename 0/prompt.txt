@@ -1,0 +1,1 @@
+hole dir das repo [https://github.com/Alebabo/COGNIFRAME.git](https://github.com/Alebabo/COGNIFRAME.git) und merge alles in main. nutze die npx skills add [https://github.com/entireio/skills](https://github.com/entireio/skills) --all um einen checkpoint zu erstellen. es ist wichtig die entire skills zu nutzen
