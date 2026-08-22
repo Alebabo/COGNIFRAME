@@ -45,6 +45,25 @@ def tts(text: str, destination: Path) -> None:
     destination.write_bytes(response.content)
 
 
+def duration(path: Path) -> float:
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return float(result.stdout.strip())
+
+
 def make_video(text: str, output: Path, color: str, audio_speed: float = 1.0) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="palantum-fixture-") as directory:
@@ -62,7 +81,9 @@ def make_video(text: str, output: Path, color: str, audio_speed: float = 1.0) ->
             str(audio),
         ]
         if audio_filter:
-            command.extend(["-filter:a", audio_filter, "-t", "5.92"])
+            command.extend(
+                ["-filter:a", audio_filter, "-t", f"{duration(audio) / audio_speed:.3f}"]
+            )
         command.extend(
             [
                 "-shortest",
