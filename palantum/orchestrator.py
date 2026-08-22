@@ -185,14 +185,17 @@ def _apply_coverage(
     ]
     resolved = list(state.get("resolved_notes", []))
     now = datetime.now(UTC).isoformat()
-    for beat_id, _old_note in old_notes.items():
+    for beat_id, old_note in old_notes.items():
         current = next((b for b in beats if b["id"] == beat_id), None)
         if (
             current
             and current["status"] in {"weak", "covered"}
             and not any(str(item.get("beat")) == beat_id for item in resolved)
         ):
-            resolved.append({"beat": beat_id, "closed_by": current.get("source"), "closed_at": now})
+            resolved_note = dict(old_note)
+            resolved_note["closed_by"] = current.get("source")
+            resolved_note["closed_at"] = now
+            resolved.append(resolved_note)
     state["beats"] = beats
     state["director_notes"] = notes
     state["resolved_notes"] = resolved

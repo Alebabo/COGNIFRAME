@@ -129,3 +129,4 @@ def test_resolved_note_is_preserved_with_closing_source() -> None:
     _apply_coverage(state, director, strategist, SCHEMA)
     assert state["resolved_notes"][0]["beat"] == "TRACTION"
     assert state["resolved_notes"][0]["closed_by"] == "take_traction"
+    assert state["resolved_notes"][0]["shot"]["line"] == "Say a number"
