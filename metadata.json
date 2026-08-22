@@ -2,7 +2,7 @@
   "cli_version": "0.10.2",
   "checkpoint_id": "de3a64b4ee0f",
   "strategy": "import",
-  "commit_sha": "c4f4efe5c1880808b6c3a9cf9e0c7952ee97a860",
+  "commit_sha": "cba5b5e82087b811e3cf25712a65a64515244bb6",
   "checkpoints_count": 1,
   "files_touched": null,
   "sessions": [
