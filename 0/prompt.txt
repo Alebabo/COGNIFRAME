@@ -1,0 +1,7 @@
+<environment_context>
+  <cwd>C:\Users\User\Documents\ChatGPT\cogniframe</cwd>
+  <shell>powershell</shell>
+  <current_date>2026-08-22</current_date>
+  <timezone>Europe/Berlin</timezone>
+  <filesystem><workspace_roots><root>C:\Users\User\Documents\ChatGPT\cogniframe</root><root>C:\Users\User\.codex\visualizations\2026\08\22\01a02b2f-8e5d-73b3-b9a1-260ca9caae9c</root></workspace_roots><permission_profile type="disabled"><file_system type="unrestricted" /></permission_profile></filesystem>
+</environment_context>
