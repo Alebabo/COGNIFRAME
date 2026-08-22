@@ -86,17 +86,19 @@ def test_upload_passes_motion_pack_to_background_job(tmp_path: Path) -> None:
     )
 
 
-def test_frontend_exposes_two_modes_dictation_and_four_output_actions(tmp_path: Path) -> None:
+def test_frontend_exposes_canvas_agent_status_and_actions(tmp_path: Path) -> None:
     response = TestClient(create_app(tmp_path)).get("/")
 
     assert response.status_code == 200
-    assert 'id="mode-script"' in response.text
-    assert 'id="mode-video"' in response.text
-    assert 'aria-label="Sachverhalt diktieren"' in response.text
-    assert response.text.count('class="action"') == 4
+    assert 'id="prompt"' in response.text
+    assert 'id="avatar-stack"' in response.text
+    assert 'id="cursor-director"' in response.text
+    assert 'id="cursor-strategist"' in response.text
+    assert 'id="cursor-supervisor"' in response.text
+    assert 'id="toolbar"' in response.text
+    assert 'id="mic"' in response.text
+    assert 'id="generate"' in response.text
     assert 'class="corner-logo"' in response.text
-    assert "data.phase==='error'" in response.text
-    assert response.text.index('id="compose-error"') < response.text.index('id="video-mode"')
 
 
 def test_frontend_serves_corner_logo(tmp_path: Path) -> None:

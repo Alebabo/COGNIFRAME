@@ -15,7 +15,14 @@ from pydantic import BaseModel
 from palantum.export import export_project
 from palantum.orchestrator import _schema, analyze, cut, gate
 from palantum.state import load
-from palantum.web.script import create_script_stream
+from palantum.web.script import (
+    BEAT_DEFAULTS,
+    BEAT_KEYS,
+    create_agent_assist_stream,
+    create_script_stream,
+    evaluate_canvas,
+    parse_canvas_beats,
+)
 
 ROLE_NAMES = {
     "A1": "Script Supervisor",
@@ -30,6 +37,81 @@ _LOCK = threading.Lock()
 
 class ScriptRequest(BaseModel):
     prompt: str
+
+
+class CanvasRequest(BaseModel):
+    title: str = "Mein Pitch"
+    text: str = ""
+    beats: dict[str, str] = {}
+    attached_videos: dict[str, str] = {}
+
+
+class CanvasAssistRequest(BaseModel):
+    prompt: str = ""
+    beat_id: str | None = None
+    current_text: str = ""
+    agent_id: str = "A2"
+
+
+def _canvas_path(edit_dir: Path) -> Path:
+    return edit_dir / "canvas.json"
+
+
+def _load_canvas(edit_dir: Path) -> dict[str, Any]:
+    path = _canvas_path(edit_dir)
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+        except (OSError, TypeError, ValueError):
+            pass
+
+    default_beats = {k: "" for k in BEAT_KEYS}
+    default_attached: dict[str, str] = {}
+    recs = evaluate_canvas(default_beats, default_attached)
+    return {
+        "title": "Mein Startup Pitch",
+        "text": "",
+        "beats": default_beats,
+        "beat_info": BEAT_DEFAULTS,
+        "attached_videos": default_attached,
+        "agent_cursors": [
+            {
+                "agent": "A2",
+                "role": "Director",
+                "name": "A2 Director",
+                "color": "#8b5cf6",
+                "beat": "HOOK",
+                "status": "active",
+            },
+            {
+                "agent": "A3",
+                "role": "Strategist",
+                "name": "A3 Strategist",
+                "color": "#f59e0b",
+                "beat": "PROBLEM",
+                "status": "evaluating",
+            },
+            {
+                "agent": "A1",
+                "role": "Supervisor",
+                "name": "A1 Supervisor",
+                "color": "#3b82f6",
+                "beat": "DEMO",
+                "status": "idle",
+            },
+        ],
+        "recommendations": recs,
+    }
+
+
+def _save_canvas(edit_dir: Path, data: dict[str, Any]) -> None:
+    edit_dir.mkdir(parents=True, exist_ok=True)
+    path = _canvas_path(edit_dir)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    temporary.replace(path)
 
 
 def _job_path(edit_dir: Path) -> Path:
@@ -106,6 +188,7 @@ def state_payload(videos_dir: Path) -> dict[str, Any]:
     edit_dir = videos_dir / "edit"
     state = load(edit_dir, _schema())
     job = _job(edit_dir)
+    canvas = _load_canvas(edit_dir)
     sources = state.get("meta", {}).get("sources", [])
     has_sources = bool(sources) or any(
         next(videos_dir.glob(pattern), None) is not None for pattern in ("*.mp4", "*.mov")
@@ -143,6 +226,7 @@ def state_payload(videos_dir: Path) -> dict[str, Any]:
     return {
         "phase": phase,
         "coverage": {"score": state.get("coverage_score", 0.0), "beats": beats},
+        "canvas": canvas,
         "notes": open_notes + resolved_notes,
         "sessions": [] if phase == "empty" else _sessions(edit_dir),
         "video_url": "/api/video" if final.exists() else None,
@@ -189,11 +273,94 @@ def create_app(
     def api_state() -> dict[str, Any]:
         return state_payload(root)
 
+    @app.get("/api/canvas")
+    def api_get_canvas() -> dict[str, Any]:
+        edit_dir = root / "edit"
+        return _load_canvas(edit_dir)
+
+    @app.post("/api/canvas")
+    def api_post_canvas(request: CanvasRequest) -> dict[str, Any]:
+        edit_dir = root / "edit"
+        current = _load_canvas(edit_dir)
+        
+        # If full text was sent, parse into beats
+        parsed_beats = dict(current.get("beats", {}))
+        if request.text:
+            new_parsed = parse_canvas_beats(request.text)
+            for k, v in new_parsed.items():
+                if v:
+                    parsed_beats[k] = v
+        if request.beats:
+            parsed_beats.update(request.beats)
+
+        attached = dict(current.get("attached_videos", {}))
+        if request.attached_videos:
+            attached.update(request.attached_videos)
+
+        recs = evaluate_canvas(parsed_beats, attached)
+
+        # Dynamic agent cursor simulation based on current focus
+        active_beats = [b for b, t in parsed_beats.items() if t.strip()]
+        last_beat = active_beats[-1] if active_beats else "HOOK"
+        agent_cursors = [
+            {
+                "agent": "A2",
+                "role": "Director",
+                "name": "A2 Director",
+                "color": "#8b5cf6",
+                "beat": last_beat,
+                "status": "active",
+            },
+            {
+                "agent": "A3",
+                "role": "Strategist",
+                "name": "A3 Strategist",
+                "color": "#f59e0b",
+                "beat": "PROBLEM" if last_beat != "PROBLEM" else "TRACTION",
+                "status": "evaluating",
+            },
+            {
+                "agent": "A1",
+                "role": "Supervisor",
+                "name": "A1 Supervisor",
+                "color": "#3b82f6",
+                "beat": "DEMO",
+                "status": "checking_clips" if attached.get("DEMO") else "idle",
+            },
+        ]
+
+        updated = {
+            "title": request.title or current.get("title", "Mein Startup Pitch"),
+            "text": request.text or current.get("text", ""),
+            "beats": parsed_beats,
+            "beat_info": BEAT_DEFAULTS,
+            "attached_videos": attached,
+            "agent_cursors": agent_cursors,
+            "recommendations": recs,
+        }
+        _save_canvas(edit_dir, updated)
+        return updated
+
+    @app.post("/api/canvas/assist")
+    def api_canvas_assist(request: CanvasAssistRequest) -> StreamingResponse:
+        chunks, generator = create_agent_assist_stream(
+            agent_id=request.agent_id,
+            beat_id=request.beat_id,
+            current_text=request.current_text,
+            brief=request.prompt,
+        )
+        return StreamingResponse(
+            chunks,
+            media_type="text/plain; charset=utf-8",
+            headers={"X-Palantum-Generator": generator, "X-Palantum-Agent": request.agent_id},
+        )
+
     @app.post("/api/upload")
     async def api_upload(
         files: Annotated[list[UploadFile] | None, File()] = None,
         bracket_files: Annotated[list[UploadFile] | None, File(alias="files[]")] = None,
         brief: Annotated[str | None, Form()] = None,
+        beat: Annotated[str | None, Form()] = None,
     ) -> JSONResponse:
         files = (files or []) + (bracket_files or [])
         if not files:
@@ -207,9 +374,21 @@ def create_app(
                     handle.write(chunk)
             sources.append(destination)
             await upload.close()
+
+        # Update canvas attached_videos if beat is specified
+        if beat and sources:
+            edit_dir = root / "edit"
+            canvas = _load_canvas(edit_dir)
+            attached = dict(canvas.get("attached_videos", {}))
+            attached[beat.upper()] = sources[0].name
+            canvas["attached_videos"] = attached
+            _save_canvas(edit_dir, canvas)
+
         _write_job(root / "edit", "queued")
         _EXECUTOR.submit(_process_upload, root, sources, brief, resolved_template)
-        return JSONResponse({"accepted": [path.name for path in sources], "phase": "working"})
+        return JSONResponse(
+            {"accepted": [p.name for p in sources], "beat": beat, "phase": "working"}
+        )
 
     @app.post("/api/script")
     def api_script(request: ScriptRequest) -> StreamingResponse:
@@ -222,6 +401,20 @@ def create_app(
             media_type="text/plain; charset=utf-8",
             headers={"X-Palantum-Generator": generator},
         )
+
+    @app.post("/api/cut")
+    def api_trigger_cut() -> JSONResponse:
+        edit_dir = root / "edit"
+        state = load(edit_dir, _schema())
+        allowed, notes = gate(state, _schema())
+        all_sources = sorted(root.glob("*.mp4")) + sorted(root.glob("*.mov"))
+        if not all_sources:
+            raise HTTPException(status_code=400, detail="Keine Videodateien vorhanden.")
+        if not allowed:
+            raise HTTPException(status_code=400, detail="Pflicht-Beats sind nicht abgedeckt.")
+        _write_job(edit_dir, "queued")
+        _EXECUTOR.submit(cut, edit_dir, all_sources, resolved_template)
+        return JSONResponse({"status": "started", "phase": "working"})
 
     @app.get("/api/video")
     def api_video() -> FileResponse:
@@ -243,3 +436,4 @@ def create_app(
     static = Path(__file__).parent / "static"
     app.mount("/", StaticFiles(directory=static, html=True), name="static")
     return app
+
