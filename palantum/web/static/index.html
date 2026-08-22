@@ -230,7 +230,7 @@
     user-select: none;
   }
   .ghost-text-grey {
-    color: #9ca3af; /* True grey verbatim autocomplete text */
+    color: #9ca3af; /* True subtle grey autocomplete text */
     opacity: 0.9;
     font-style: normal;
   }
@@ -244,7 +244,7 @@
     height: 100%;
     pointer-events: none;
     overflow: visible;
-    z-index: 10;
+    z-index: 50;
   }
   .agent-cursor {
     position: absolute;
@@ -254,12 +254,12 @@
     transition: transform 380ms cubic-bezier(0.25, 1, 0.5, 1), opacity 240ms ease;
     opacity: 0;
     pointer-events: none;
-    z-index: 20;
+    z-index: 60;
     transform: translate(0, 0);
   }
   .agent-cursor.visible {
     opacity: 1;
-    pointer-events: auto;
+    pointer-events: auto !important;
   }
   .cursor-caret {
     width: 2px;
@@ -272,26 +272,29 @@
     50% { opacity: 0.25; }
   }
 
-  /* Floating Advice Box: Clean white box showing ONLY the advice / missing item */
+  /* Floating Advice Box: Compact, elegant pill with ONLY the clean advice & close button */
   .floating-advice {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 6px);
     left: 0;
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 12px;
+    padding: 5px 10px;
     background: #ffffff;
     border: 1px solid var(--border);
     border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-    font-size: 13px;
-    color: #374151;
-    pointer-events: auto;
-    z-index: 30;
-    animation: popIn 180ms ease both;
-    max-width: 380px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.09);
+    font-size: 12px;
     line-height: 1.35;
+    color: #374151;
+    max-width: 320px;
+    width: max-content;
+    pointer-events: all !important;
+    cursor: default;
+    z-index: 100;
+    animation: popIn 180ms ease both;
+    user-select: none;
   }
   @keyframes popIn {
     from { opacity: 0; transform: translateY(4px) scale(0.97); }
@@ -299,18 +302,22 @@
   }
   .advice-text {
     flex: 1;
-    word-break: break-word;
+    font-size: 12px;
+    color: #4b5563;
+    font-weight: 400;
+    pointer-events: all !important;
   }
   .advice-close {
     border: none;
     background: transparent;
-    color: var(--muted);
+    color: #9ca3af;
     font-size: 16px;
     line-height: 1;
-    cursor: pointer;
-    padding: 0 3px;
+    cursor: pointer !important;
+    padding: 2px 6px;
     border-radius: 3px;
     flex-shrink: 0;
+    pointer-events: all !important;
     transition: color 150ms ease, background 150ms ease;
   }
   .advice-close:hover {
@@ -338,12 +345,6 @@
     box-sizing: border-box;
   }
 
-  /* Question & Attachments */
-  .question {
-    font-size: 13px;
-    color: var(--muted);
-    margin-top: 16px;
-  }
   .attachment-list {
     display: flex;
     flex-wrap: wrap;
@@ -671,33 +672,32 @@
       <!-- Director Cursor & Floating Advice -->
       <div id="cursor-director" class="agent-cursor director">
         <div class="cursor-caret"></div>
-        <div id="advice-director" class="floating-advice" hidden>
+        <div id="advice-director" class="floating-advice" style="display:none;">
           <span class="advice-text" id="advice-text-director"></span>
-          <button type="button" class="advice-close" title="Hinweis schließen" onclick="dismissAdvice(event, 'director')">×</button>
+          <button type="button" class="advice-close" title="Hinweis schließen" onmousedown="dismissAdvice(event, 'director')" onclick="dismissAdvice(event, 'director')">×</button>
         </div>
       </div>
 
       <!-- Strategist Cursor & Floating Advice -->
       <div id="cursor-strategist" class="agent-cursor strategist">
         <div class="cursor-caret"></div>
-        <div id="advice-strategist" class="floating-advice" hidden>
+        <div id="advice-strategist" class="floating-advice" style="display:none;">
           <span class="advice-text" id="advice-text-strategist"></span>
-          <button type="button" class="advice-close" title="Hinweis schließen" onclick="dismissAdvice(event, 'strategist')">×</button>
+          <button type="button" class="advice-close" title="Hinweis schließen" onmousedown="dismissAdvice(event, 'strategist')" onclick="dismissAdvice(event, 'strategist')">×</button>
         </div>
       </div>
 
       <!-- Supervisor Cursor & Floating Advice -->
       <div id="cursor-supervisor" class="agent-cursor supervisor">
         <div class="cursor-caret"></div>
-        <div id="advice-supervisor" class="floating-advice" hidden>
+        <div id="advice-supervisor" class="floating-advice" style="display:none;">
           <span class="advice-text" id="advice-text-supervisor"></span>
-          <button type="button" class="advice-close" title="Hinweis schließen" onclick="dismissAdvice(event, 'supervisor')">×</button>
+          <button type="button" class="advice-close" title="Hinweis schließen" onmousedown="dismissAdvice(event, 'supervisor')" onclick="dismissAdvice(event, 'supervisor')">×</button>
         </div>
       </div>
     </div>
   </div>
 
-  <div id="question" class="question" hidden></div>
   <div id="attachments" class="attachment-list" aria-live="polite"></div>
   <div id="compose-error" class="error" role="alert" hidden></div>
 
@@ -770,6 +770,7 @@ const state = {
   orchestrateDebounce: null,
   dismissed: {},
   activeGhostText: '',
+  ghostAnchorIndex: -1,
   activeRecommendations: [],
 };
 
@@ -850,10 +851,10 @@ function getWordCoordinates(charIndex) {
   };
 }
 
-// Update the inline grey ghost text directly in the canvas
+// Update the inline grey ghost text directly in the canvas (supports middle-of-text positioning)
 function updateGhostOverlay() {
   const prompt = $('prompt');
-  const text = prompt.value;
+  const text = prompt.value || '';
   const ghost = state.activeGhostText || '';
 
   if (!ghost || !text.trim()) {
@@ -861,15 +862,26 @@ function updateGhostOverlay() {
     return;
   }
 
-  const escapedText = escapeHtml(text);
-  const prefixSpace = (text.endsWith(' ') || text.endsWith('\n') || ghost.startsWith(' ')) ? '' : ' ';
+  // Anchor at cursor position if in middle of text, else at end of text
+  const cursorIndex = (prompt.selectionStart >= 0 && prompt.selectionStart <= text.length)
+    ? prompt.selectionStart
+    : text.length;
+
+  const insertPos = (state.ghostAnchorIndex >= 0 && state.ghostAnchorIndex <= text.length)
+    ? state.ghostAnchorIndex
+    : cursorIndex;
+
+  const before = text.slice(0, insertPos);
+  const after = text.slice(insertPos);
+
+  const prefixSpace = (before.endsWith(' ') || before.endsWith('\n') || ghost.startsWith(' ') || !before) ? '' : ' ';
   const escapedGhost = escapeHtml(prefixSpace + ghost);
 
-  // Render hidden prefix + visible grey ghost text
-  $('ghost-overlay').innerHTML = `<span style="visibility: hidden;">${escapedText}</span><span class="ghost-text-grey">${escapedGhost}</span>`;
+  // Middle-of-text shifting layout
+  $('ghost-overlay').innerHTML = `<span style="visibility: hidden;">${escapeHtml(before)}</span><span class="ghost-text-grey">${escapedGhost}</span><span style="visibility: hidden;">${escapeHtml(after)}</span>`;
 }
 
-// Dismiss an advice note
+// Dismiss an advice note permanently
 function dismissAdvice(event, agentKey) {
   if (event) {
     event.stopPropagation();
@@ -877,37 +889,59 @@ function dismissAdvice(event, agentKey) {
   }
   state.dismissed[agentKey] = true;
   const advice = $(`advice-${agentKey}`);
-  if (advice) advice.hidden = true;
+  if (advice) {
+    advice.hidden = true;
+    advice.style.display = 'none';
+  }
 }
 
-// Keyboard shortcut: Tab accepts the verbatim grey ghost text directly into the textarea
+// Keyboard shortcut: Tab accepts the verbatim grey ghost text directly at caret
 $('prompt').addEventListener('keydown', event => {
   if (event.key === 'Tab' && state.activeGhostText) {
     event.preventDefault();
     const prompt = $('prompt');
-    const current = prompt.value;
+    const text = prompt.value || '';
     const ghost = state.activeGhostText;
 
-    // Check if greeting on first line and director suggested clean hook
-    if (/^(hallo|hi|herzlich willkommen[,\s]*|mein name ist[^\.]*\.)\s*/i.test(current)) {
-      prompt.value = current.replace(/^(hallo|hi|herzlich willkommen[,\s]*|mein name ist[^\.]*\.)\s*/i, `${ghost} `);
-    } else {
-      const prefixSpace = (current.endsWith(' ') || current.endsWith('\n') || ghost.startsWith(' ')) ? '' : ' ';
-      prompt.value = current + prefixSpace + ghost;
-    }
+    const insertPos = (state.ghostAnchorIndex >= 0 && state.ghostAnchorIndex <= text.length)
+      ? state.ghostAnchorIndex
+      : prompt.selectionStart || text.length;
+
+    const before = text.slice(0, insertPos);
+    const after = text.slice(insertPos);
+    const prefixSpace = (before.endsWith(' ') || before.endsWith('\n') || ghost.startsWith(' ') || !before) ? '' : ' ';
+
+    // Insert ghost text at exact anchor / caret position
+    prompt.value = before + prefixSpace + ghost + after;
+    const newPos = before.length + prefixSpace.length + ghost.length;
+    prompt.setSelectionRange(newPos, newPos);
 
     state.activeGhostText = '';
+    state.ghostAnchorIndex = -1;
     updateGhostOverlay();
     updateComposer(true);
   } else if (event.key === 'Escape') {
     state.activeGhostText = '';
+    state.ghostAnchorIndex = -1;
     updateGhostOverlay();
+    // Also dismiss any open floating advice on Escape
+    ['director', 'strategist', 'supervisor'].forEach(k => dismissAdvice(null, k));
   }
+});
+
+// Update ghost on cursor position change
+$('prompt').addEventListener('keyup', () => {
+  if (state.activeGhostText) updateGhostOverlay();
+});
+$('prompt').addEventListener('click', () => {
+  if (state.activeGhostText) updateGhostOverlay();
 });
 
 // Position cursors and update floating advice pills based on live LLM evaluation
 function renderAgentRecommendations() {
   const text = $('prompt').value;
+  const words = text.trim().split(/\s+/).filter(Boolean);
+
   const cDirector = $('cursor-director');
   const cStrategist = $('cursor-strategist');
   const cSupervisor = $('cursor-supervisor');
@@ -920,14 +954,16 @@ function renderAgentRecommendations() {
   const sStrategist = $('status-strategist');
   const sSupervisor = $('status-supervisor');
 
-  if (!text.trim() || text.length < 15) {
+  // Do NOT prematurely invent suggestions if text is too short or vague (< 25 chars or < 5 words)
+  if (!text.trim() || text.trim().length < 25 || words.length < 5) {
     cDirector.classList.remove('visible');
     cStrategist.classList.remove('visible');
     cSupervisor.classList.remove('visible');
-    adviceDirector.hidden = true;
-    adviceStrategist.hidden = true;
-    adviceSupervisor.hidden = true;
+    adviceDirector.style.display = 'none';
+    adviceStrategist.style.display = 'none';
+    adviceSupervisor.style.display = 'none';
     state.activeGhostText = '';
+    state.ghostAnchorIndex = -1;
     updateGhostOverlay();
     if (sDirector) sDirector.textContent = 'bereit';
     if (sStrategist) sStrategist.textContent = 'bereit';
@@ -944,16 +980,21 @@ function renderAgentRecommendations() {
   const recStrat = recs.find(r => r.agent === 'A3' || (r.role && r.role.toLowerCase().includes('strateg')));
   const recSuper = recs.find(r => r.agent === 'A1' || (r.role && r.role.toLowerCase().includes('supervisor')));
 
-  // Choose the best active ghost text for Tab autocomplete (Director > Strategist > Supervisor)
+  // Pick best ghost text
   let bestGhost = '';
+  let bestAnchor = -1;
   if (recDir && recDir.ghost_text && !state.dismissed['director']) {
     bestGhost = recDir.ghost_text;
+    bestAnchor = text.indexOf('.') !== -1 ? text.indexOf('.') : text.length;
   } else if (recStrat && recStrat.ghost_text && !state.dismissed['strategist']) {
     bestGhost = recStrat.ghost_text;
+    bestAnchor = text.length;
   } else if (recSuper && recSuper.ghost_text && !state.dismissed['supervisor']) {
     bestGhost = recSuper.ghost_text;
+    bestAnchor = text.length;
   }
   state.activeGhostText = bestGhost;
+  state.ghostAnchorIndex = bestAnchor;
   updateGhostOverlay();
 
   // 1. Director Cursor & Clean Advice (Anchored to sentence 1 / Hook)
@@ -963,15 +1004,18 @@ function renderAgentRecommendations() {
   cDirector.classList.add('visible');
   if (sDirector) sDirector.textContent = 'Hook analysiert';
 
+  // Automatically hide if issue was solved (recDir not returned) or if dismissed
   if (recDir && !state.dismissed['director'] && (recDir.message || recDir.missing_item)) {
     $('advice-text-director').textContent = recDir.message || recDir.missing_item;
     adviceDirector.hidden = false;
+    adviceDirector.style.display = 'inline-flex';
   } else {
     adviceDirector.hidden = true;
+    adviceDirector.style.display = 'none';
   }
 
   // 2. Strategist Cursor & Clean Advice (Anchored to middle / sentence 2)
-  if (text.length >= 50) {
+  if (text.length >= 60 && words.length >= 8) {
     let stratChar = Math.floor(text.length * 0.5);
     if (sentences.length > 1) {
       stratChar = text.indexOf(sentences[1]) + Math.min(25, sentences[1].length);
@@ -981,55 +1025,49 @@ function renderAgentRecommendations() {
     cStrategist.classList.add('visible');
     if (sStrategist) sStrategist.textContent = 'KPIs analysiert';
 
+    // Automatically hide if issue was solved or dismissed
     if (recStrat && !state.dismissed['strategist'] && (recStrat.message || recStrat.missing_item)) {
       $('advice-text-strategist').textContent = recStrat.message || recStrat.missing_item;
       adviceStrategist.hidden = false;
+      adviceStrategist.style.display = 'inline-flex';
     } else {
       adviceStrategist.hidden = true;
+      adviceStrategist.style.display = 'none';
     }
   } else {
     cStrategist.classList.remove('visible');
-    adviceStrategist.hidden = true;
+    adviceStrategist.style.display = 'none';
     if (sStrategist) sStrategist.textContent = 'bereit';
   }
 
   // 3. Supervisor Cursor & Clean Advice (Anchored to end / CTA)
-  if (text.length >= 90) {
+  if (text.length >= 100 && words.length >= 15) {
     const posSuper = getWordCoordinates(text.length);
     cSupervisor.style.transform = `translate(${posSuper.left}px, ${posSuper.top}px)`;
     cSupervisor.classList.add('visible');
     if (sSupervisor) sSupervisor.textContent = 'Länge & CTA analysiert';
 
+    // Automatically hide if issue was solved or dismissed
     if (recSuper && !state.dismissed['supervisor'] && (recSuper.message || recSuper.missing_item)) {
       $('advice-text-supervisor').textContent = recSuper.message || recSuper.missing_item;
       adviceSupervisor.hidden = false;
+      adviceSupervisor.style.display = 'inline-flex';
     } else {
       adviceSupervisor.hidden = true;
+      adviceSupervisor.style.display = 'none';
     }
   } else {
     cSupervisor.classList.remove('visible');
-    adviceSupervisor.hidden = true;
+    adviceSupervisor.style.display = 'none';
     if (sSupervisor) sSupervisor.textContent = 'bereit';
   }
-}
-
-function completeness(text) {
-  const value = text.trim();
-  if (!value) return { complete: false, question: null };
-  const subject = /\b(mein|meine|unser|unsere|ich|wir|produkt|service|app|unternehmen|idee|tool|plattform)\b/i.test(value);
-  const outcome = /\b(zeigen|erklären|vorstellen|überzeugen|verkaufen|launch|gewinnen|suchen|möchte|soll|ziel|cta|invest)\w*/i.test(value);
-  if (!subject) return { complete: false, question: 'Worum geht es konkret – um ein Produkt, ein Unternehmen oder eine Idee?' };
-  if (!outcome) return { complete: false, question: 'Was soll das Video erreichen – erklären, überzeugen oder zu einer Handlung führen?' };
-  return { complete: true, question: null };
 }
 
 function updateComposer(immediate = false) {
   autosize($('prompt'));
   updateGhostOverlay();
-  const check = completeness($('prompt').value);
-  $('question').textContent = check.question || '';
-  $('question').hidden = !check.question;
-  $('generate').disabled = !check.complete || state.generating;
+  const text = $('prompt').value.trim();
+  $('generate').disabled = text.length < 10 || state.generating;
   $('create-video').hidden = $('script-result').hidden || state.uploading;
 
   // React on typing pause
@@ -1037,7 +1075,7 @@ function updateComposer(immediate = false) {
   if (immediate) {
     renderAgentRecommendations();
   } else {
-    state.typingTimeout = setTimeout(renderAgentRecommendations, 350);
+    state.typingTimeout = setTimeout(renderAgentRecommendations, 300);
   }
 
   // Trigger live genuine backend orchestration on typing pause
@@ -1047,7 +1085,8 @@ function updateComposer(immediate = false) {
 
 async function triggerAgenticOrchestration() {
   const prompt = $('prompt').value.trim();
-  if (prompt.length < 15) return;
+  const words = prompt.split(/\s+/).filter(Boolean);
+  if (prompt.length < 25 || words.length < 5) return;
   try {
     const res = await fetch('/api/devin/orchestrate', {
       method: 'POST',
@@ -1094,7 +1133,7 @@ function selectFiles(files) {
 
 async function generateScript() {
   const prompt = $('prompt').value.trim();
-  if (!completeness(prompt).complete || state.generating) return;
+  if (prompt.length < 10 || state.generating) return;
   state.generating = true;
   $('compose-error').hidden = true;
   $('script-result').hidden = false;

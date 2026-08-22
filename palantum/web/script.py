@@ -127,9 +127,10 @@ def evaluate_canvas_agentic(
 ) -> list[dict[str, Any]]:
     """Perform real-time multi-agent critique using LLM (OpenAI/Devin) for authentic feedback."""
     trimmed = text.strip()
-    if not trimmed or len(trimmed) < 15:
-        beats = parse_canvas_beats(trimmed)
-        return evaluate_canvas(beats, attached_videos)
+    words = trimmed.split()
+    # Wait until user has typed at least 25 chars and 5 words of context
+    if not trimmed or len(trimmed) < 25 or len(words) < 5:
+        return []
 
     cache_key = f"{trimmed}|{brief}|{json.dumps(attached_videos or {}, sort_keys=True)}"
     now = time.time()
@@ -150,9 +151,10 @@ def evaluate_canvas_agentic(
         "- A3 (Strategist): Pitch-Story, harte KPIs/Zahlen, messbarer Nutzen, Zielgruppe.\n"
         "- A1 (Supervisor): Skript-Länge (~130 Wörter), Wortgrenzen, klarer CTA.\n\n"
         f"Hier ist der aktuelle Rohentwurf des Nutzers:\n\"\"\"\n{trimmed}\n\"\"\"\n\n"
-        "Aufgabe: Analysiere den Text präzise. Formuliere für bis zu 3 Agenten inhaltsspezifische "
-        "Kritikpunkte (KEINE generischen Ratschläge) und für jeden Agenten einen exakten, "
-        "sprechbaren Verbatim-Ghost-Text zum Einfügen.\n\n"
+        "Aufgabe: Analysiere den Text. WICHTIGE REGEL: Wenn ein Aspekt (z.B. Hook ohne Begrüßung, "
+        "vorhandene KPIs/Zahlen oder CTA) bereits GUT formuliert ist, erzeuge für diesen Agenten "
+        "KEINE Recommendation! Gib nur dann Einträge in 'recommendations' zurück, wenn wirklich "
+        "ein konkretes Problem vorliegt. Wenn alles gelöst ist, gib ein leeres Array [] aus.\n\n"
         "Antworte ausschließlich als valides JSON-Objekt mit folgender Struktur:\n"
         "{\n"
         '  "recommendations": [\n'
@@ -162,8 +164,8 @@ def evaluate_canvas_agentic(
         '      "role": "Director",\n'
         '      "beat": "HOOK",\n'
         '      "missing_item": "Konkreter Hook / Visuelle Eröffnung",\n'
-        '      "message": "Präzise, inhaltliche Kritik zum Entwurf...",\n'
-        '      "ghost_text": "Exakter ausformulierter Satz zum Einfügen...",\n'
+        '      "message": "Knapper Ratschlag...",\n'
+        '      "ghost_text": "Thematisch passender Satz...",\n'
         '      "anchor": "hook",\n'
         '      "anchor_line": 0\n'
         "    }\n"
@@ -186,7 +188,7 @@ def evaluate_canvas_agentic(
                 },
                 {"role": "user", "content": prompt},
             ],
-            timeout=12,
+            timeout=10,
         )
         content = response.choices[0].message.content or "{}"
         parsed = json.loads(content)
@@ -221,7 +223,7 @@ def evaluate_canvas(
             "type": "missing",
             "missing_item": "Hook & Nutzenversprechen",
             "message": "Der Hook fehlt noch. Starte mit einer starken These.",
-            "ghost_text": "Zwei Stunden Fehlersuche werden zu zwei Minuten.",
+            "ghost_text": "",
             "target_pattern": "",
             "anchor": "hook",
             "anchor_line": 0,
@@ -233,7 +235,7 @@ def evaluate_canvas(
             hook,
             flags=re.IGNORECASE,
         ).strip()
-        first_cap = clean_hook.capitalize() if clean_hook else "Wir automatisieren den Ablauf."
+        first_cap = clean_hook.capitalize() if clean_hook else ""
         recs.append({
             "id": "rec-hook-greeting",
             "agent": "A3",
@@ -259,7 +261,7 @@ def evaluate_canvas(
             "type": "missing",
             "missing_item": "Konkreter Schmerzpunkt",
             "message": "Definiere das konkrete Problem: Wer verliert Zeit oder Geld?",
-            "ghost_text": "Entwickler verlieren täglich wertvolle Zeit durch manuelle Schritte.",
+            "ghost_text": "",
             "target_pattern": "",
             "anchor": "problem",
             "anchor_line": 1,
@@ -273,7 +275,7 @@ def evaluate_canvas(
             "type": "missing",
             "missing_item": "Präzisierung des Schmerzpunkts",
             "message": "Das Problem ist noch abstrakt. Benenne den Schmerzpunkt präziser.",
-            "ghost_text": f"{problem} – wodurch Teams jede Woche Stunden verlieren.",
+            "ghost_text": f"{problem} (konkretisiert)",
             "target_pattern": problem,
             "anchor": "problem",
             "anchor_line": 1,
@@ -290,7 +292,7 @@ def evaluate_canvas(
             "type": "missing",
             "missing_item": "Lösungsmechanismus",
             "message": "Erkläre den Mechanismus deiner Lösung (nicht nur Adjektive).",
-            "ghost_text": "Unsere Technologie isoliert die Fehlerursache automatisch in Echtzeit.",
+            "ghost_text": "",
             "target_pattern": "",
             "anchor": "solution",
             "anchor_line": 2,
@@ -307,7 +309,7 @@ def evaluate_canvas(
             "type": "missing",
             "missing_item": "Visuelles Demo-Material",
             "message": "Für DEMO wird visuelles Produktmaterial benötigt (Screen-Recording).",
-            "ghost_text": "[Hier Screen-Recording oder UI-Demo anhängen]",
+            "ghost_text": "",
             "target_pattern": "",
             "anchor": "demo",
             "anchor_line": 3,
@@ -324,7 +326,7 @@ def evaluate_canvas(
             "type": "missing",
             "missing_item": "Harte Kennzahlen & Traction",
             "message": "Traction ohne Zahlen wirkt schwach. Nenne messbare Nutzerzahlen.",
-            "ghost_text": "Über 100 Teams nutzen die Lösung bereits produktiv im Alltag.",
+            "ghost_text": "",
             "target_pattern": "",
             "anchor": "traction",
             "anchor_line": 4,
@@ -341,7 +343,7 @@ def evaluate_canvas(
             "type": "missing",
             "missing_item": "Call to Action (CTA)",
             "message": "Schließe mit einem klaren Call to Action ab.",
-            "ghost_text": "Teste die Beta jetzt kostenlos auf unserer Website.",
+            "ghost_text": "",
             "target_pattern": "",
             "anchor": "ask",
             "anchor_line": 5,
