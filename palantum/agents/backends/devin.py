@@ -36,7 +36,10 @@ def call(
     }
     run_number = context.get("run_number", 0)
     payload: dict[str, Any] = {
-        "prompt": f"{prompt}\n\nINPUT JSON:\n{json.dumps(context, ensure_ascii=False)}",
+        "prompt": (
+            f"{prompt}\n\nINPUT JSON:\n"
+            f"{json.dumps(context, ensure_ascii=False, separators=(',', ':'))}"
+        ),
         "structured_output_schema": schema,
         "tags": [f"run-{run_number}", role_id],
         "title": f"Palantum {role_id} · run {run_number}",
@@ -47,7 +50,14 @@ def call(
         payload["snapshot_id"] = snapshot_id
 
     created = requests.post(f"{base_url}/sessions", headers=headers, json=payload, timeout=60)
-    created.raise_for_status()
+    try:
+        created.raise_for_status()
+    except requests.HTTPError as exc:
+        detail = created.text.strip()[:2000]
+        raise RuntimeError(
+            f"Devin role {role_id} session creation failed "
+            f"({created.status_code}): {detail or 'no response body'}"
+        ) from exc
     session = created.json()
     session_id = str(session["session_id"])
     session_url = str(session["url"])
@@ -62,11 +72,11 @@ def call(
         response.raise_for_status()
         current = response.json()
         status = current.get("status_enum") or current.get("status")
-        if status == "finished":
-            output = current.get("structured_output")
-            if not isinstance(output, dict):
-                raise ValueError(f"Devin role {role_id} returned no structured output")
+        output = current.get("structured_output")
+        if status in {"finished", "blocked"} and isinstance(output, dict):
             return DevinCallResult(output=output, session_id=session_id, url=session_url)
+        if status == "finished" and not isinstance(output, dict):
+            raise ValueError(f"Devin role {role_id} returned no structured output")
         if status in {"blocked", "expired"}:
             raise RuntimeError(f"Devin role {role_id} ended {status}: {current}")
         time.sleep(poll_interval_s)

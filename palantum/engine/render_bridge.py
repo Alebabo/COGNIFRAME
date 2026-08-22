@@ -12,7 +12,7 @@ _WINDOWS_SUBTITLE_PATH_FIXED = (
     'str(subtitles_path.resolve()).replace("\\\\", "/").replace(":", r"\\:")'
 )
 _OVERLAY_FILTER = "overlay=enable='between"
-_OVERLAY_FILTER_FIXED = "overlay=shortest=1:enable='between"
+_OVERLAY_FILTER_FIXED = "overlay=eof_action=pass:shortest=0:enable='between"
 
 
 def patch_render_source(source: str) -> str:

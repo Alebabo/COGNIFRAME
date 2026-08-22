@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from palantum.orchestrator import (
+    _cached_role,
     _graphics_overlays,
+    _npm_install_command,
     _selectable_scenes,
     _validate_overlay_plan,
 )
@@ -45,6 +48,13 @@ def test_overlay_plan_enforces_catalog_slots_timing_and_non_overlap() -> None:
     }
 
     assert _validate_overlay_plan([overlay], scenes, timeline)[0]["scene"] == scenes[0]
+
+    overlong = dict(overlay, duration=10.0)
+    assert _validate_overlay_plan([overlong], scenes, timeline)[0]["duration"] == 3.0
+
+    stale_timing = dict(overlay, start_in_output=20.0)
+    fitted = _validate_overlay_plan([stale_timing], scenes, timeline)[0]
+    assert fitted["start_in_output"] == 2.0
 
     invalid = dict(overlay, props={"title": "x" * 21})
     with pytest.raises(ValueError, match="max_chars"):
@@ -124,3 +134,25 @@ def test_only_a0_approved_scenes_are_selectable() -> None:
     broken = _scene("flowchart", "SOLUTION") | {"status": "broken"}
 
     assert _selectable_scenes({"scenes": [approved, low_confidence, broken]}) == [approved]
+
+
+def test_npm_install_uses_windows_command_launcher() -> None:
+    command = _npm_install_command()
+    if os.name == "nt":
+        assert command[1:5] == ["/d", "/s", "/c", "npm"]
+    else:
+        assert command[0] == "npm"
+
+
+def test_role_cache_resumes_without_calling_backend(tmp_path: Path) -> None:
+    with patch("palantum.orchestrator.run_role", return_value={"ranges": []}) as run:
+        assert _cached_role(tmp_path, "A4", "A4", "prompt", {}, resume=False) == {
+            "ranges": []
+        }
+    run.assert_called_once()
+
+    with patch("palantum.orchestrator.run_role") as run:
+        assert _cached_role(tmp_path, "A4", "A4", "prompt", {}, resume=True) == {
+            "ranges": []
+        }
+    run.assert_not_called()

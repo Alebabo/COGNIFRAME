@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 from unittest.mock import call as mock_call
 
 import pytest
+import requests
 
 from palantum.agents.backends.devin import call
 
@@ -80,6 +81,38 @@ def test_poll_interval_defaults_to_ten_seconds() -> None:
         call("A3", "challenge", {}, {"type": "object"})
 
     sleep.assert_called_once_with(10.0)
+
+
+def test_blocked_session_with_structured_output_is_complete() -> None:
+    created = _response({"session_id": "session-a1", "url": "https://app/session-a1"})
+    blocked = _response(
+        {
+            "status": "running",
+            "status_enum": "blocked",
+            "structured_output": {"takes": [], "beat_candidates": []},
+        }
+    )
+    with (
+        patch.dict("os.environ", {"DEVIN_API_KEY": "key"}, clear=True),
+        patch("palantum.agents.backends.devin.requests.post", return_value=created),
+        patch("palantum.agents.backends.devin.requests.get", return_value=blocked),
+    ):
+        result = call("A1", "measure", {}, {"type": "object"})
+
+    assert result.output == {"takes": [], "beat_candidates": []}
+
+
+def test_session_creation_error_includes_devin_response() -> None:
+    rejected = _response({"detail": "prompt is too large"})
+    rejected.status_code = 400
+    rejected.text = '{"detail":"prompt is too large"}'
+    rejected.raise_for_status.side_effect = requests.HTTPError("bad request")
+    with (
+        patch.dict("os.environ", {"DEVIN_API_KEY": "key"}, clear=True),
+        patch("palantum.agents.backends.devin.requests.post", return_value=rejected),
+        pytest.raises(RuntimeError, match="prompt is too large"),
+    ):
+        call("A2", "direct", {}, {"type": "object"})
 
 
 @pytest.mark.parametrize("status", ["blocked", "expired"])

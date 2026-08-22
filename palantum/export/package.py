@@ -49,7 +49,7 @@ def _hardlink_or_copy(source: Path, destination: Path) -> None:
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text())
+    value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise ValueError(f"expected JSON object in {path}")
     return value

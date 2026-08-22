@@ -16,7 +16,7 @@ def test_windows_render_bridge_normalizes_subtitle_filter_paths() -> None:
         result = patch_render_source(source)
 
     assert '.replace("\\\\", "/").replace(":", r"\\:")' in result
-    assert "overlay=shortest=1:enable='between" in result
+    assert "overlay=eof_action=pass:shortest=0:enable='between" in result
 
 
 def test_windows_render_bridge_fails_if_pinned_expression_drifted() -> None:

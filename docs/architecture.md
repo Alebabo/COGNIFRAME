@@ -40,11 +40,19 @@ ingest(file) -> transcribe (cached) -> pack -> A1 -> A2 <-> A3 -> coverage.json
                              all required beats >= weak? no -> stop, print Director Notes
                                                         yes
                                                          v
-                         A4 -> A6 -> parallel A6.x slots -> edl.json -> render.py -> A7
-                                                         |
-                                              fail -> one re-iteration
-                                                         v
-                                              final.mp4 + export package
+                         CLI: A4 -> A6 -> parallel A6.x slots -> render.py -> A7
+                         Web: A4 semantic chunks
+                                  |
+                                  +-> parallel A4.A / A4.B per chunk
+                                      (B may run A6 + parallel A6.x)
+                                  |
+                                  v
+                         chunks.json + two previews per chunk
+                                  |
+                         user selects one variant per chunk
+                                  |
+                                  v
+                         combined edl.json -> render.py -> A7 -> final.mp4
 ```
 
 Conflict rules, enforced by the orchestrator and not negotiable by any agent:
@@ -72,21 +80,29 @@ parses prose. Two interchangeable backends:
 
 ## Web API contract
 
-`palantum/web/static/index.html` is the whole frontend: one white page, three states
-(empty → working → done), no build step. It renders from one endpoint and polls it every 1.5 s.
+`palantum/web/static/index.html` is the whole frontend: one white page, four states
+(empty → working → review → done), no build step. It renders from one endpoint and polls it every 1.5 s.
 `?mock=work|done|empty` renders the same page against the checked-in fixture files instead of the
 server, which is how the page is developed and verified without a backend.
 
 ```
 GET  /api/state -> {
-  "phase": "empty" | "working" | "done",
+  "phase": "empty" | "working" | "review" | "done",
   "coverage": { "score": 0.57, "beats": [{"id": "HOOK", "status": "covered", "reason": "..."}] },
   "notes":    [{"beat", "impact", "resolved", "why", "shot": {"line", "framing", "duration_s", "delivery"}}],
   "sessions": [{"role": "Director", "status": "idle"|"running"|"done", "url": null | "<devin session url>"}],
   "video_url":  null | "/api/video",
-  "export_url": null | "/api/export"
+  "export_url": null | "/api/export",
+  "chunks": [{
+    "id": "chunk-00-hook", "beat": "HOOK", "selected": null | "a" | "b",
+    "variants": [{"id": "a" | "b", "name", "strategy", "video_url"}]
+  }],
+  "selection_complete": false
 }
 POST /api/upload      multipart: files[] (+ optional brief) -> ingest, recompute coverage
+POST /api/chunks/{chunk_id}/selection  {"variant_id":"a"|"b"}
+GET  /api/chunks/{chunk_id}/variants/{variant_id}/video
+POST /api/finalize    combine the selected variants and start the final render
 GET  /api/video       final.mp4
 GET  /api/export      the §7 package as a zip
 ```

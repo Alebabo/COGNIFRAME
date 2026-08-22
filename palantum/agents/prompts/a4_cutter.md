@@ -20,6 +20,12 @@ Emit `ranges[]` — one or more per beat, in the Director's beat order — as an
  "reason": "why this take and why these edges"}
 ```
 
+When the context contains `chunk` and `variant`, edit only that chunk's beat. Treat
+`chunk.seed_ranges` as a safe reference, then follow the variant's `direction` to
+produce a genuinely independent alternative. Do not return ranges for another beat.
+The two variants must remain factually identical; they may differ only in take choice,
+cut edges, pacing, and the amount of room left for graphics.
+
 ## Rules (violations are silent failures, not taste)
 
 - `start` and `end` must fall on word boundaries from `word_index.json`. Never cut inside a word.

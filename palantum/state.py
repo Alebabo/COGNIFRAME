@@ -59,5 +59,7 @@ def load(edit_dir: Path, schema: dict[str, Any]) -> dict[str, Any]:
 def save(edit_dir: Path, state: dict[str, Any]) -> Path:
     edit_dir.mkdir(parents=True, exist_ok=True)
     path = edit_dir / "coverage.json"
-    path.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n")
+    path.write_text(
+        json.dumps(state, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     return path

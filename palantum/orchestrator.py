@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
@@ -24,10 +25,42 @@ from palantum.state import coverage_score, load, save
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text())
+    value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise ValueError(f"expected object in {path}")
     return value
+
+
+def _write_json(path: Path, value: dict[str, Any]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(f"{path.suffix}.tmp")
+    temporary.write_text(
+        json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    temporary.replace(path)
+    return path
+
+
+def _cached_role(
+    edit_dir: Path,
+    cache_key: str,
+    role_id: str,
+    prompt: str,
+    context: dict[str, Any],
+    *,
+    resume: bool,
+) -> dict[str, Any]:
+    if not re.fullmatch(r"[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*", cache_key):
+        raise ValueError(f"unsafe role cache key: {cache_key}")
+    path = edit_dir / "role-cache" / f"{cache_key}.json"
+    if resume and path.exists():
+        return _read_json(path)
+    output = run_role(role_id, prompt, context, None)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return output
 
 
 def _schema() -> dict[str, Any]:
@@ -308,7 +341,9 @@ def _merge_template_assessment(
             if static.get("status") == "ok" and item["status"] == "ok"
             else "broken"
         )
-    catalog_path.write_text(json.dumps(catalog, indent=2, ensure_ascii=False) + "\n")
+    catalog_path.write_text(
+        json.dumps(catalog, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     return catalog
 
 
@@ -369,15 +404,34 @@ def analyze(
                 run_role, "A0", _prompt("A0"), a0_context, None
             )
         a1 = a1_future.result()
+        (edit_dir / "script-supervisor.json").write_text(
+            json.dumps(a1, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
         if a0_future is not None and catalog is not None:
             catalog = _merge_template_assessment(catalog_path, catalog, a0_future.result())
-    context["a1"] = a1
-    context["script_supervisor"] = a1
-    context["beat_candidates"] = a1["beat_candidates"]
-    a2 = run_role("A2", _prompt("A2"), context, None)
-    context["a2"] = a2
-    context["director"] = a2
-    a3 = run_role("A3", _prompt("A3"), context, None)
+    a2_context = {
+        "run_number": context["run_number"],
+        "_session_state_path": context["_session_state_path"],
+        "schema": context["schema"],
+        "previous_coverage": context["previous_coverage"],
+        "takes_packed": context["takes_packed"],
+        "probe": context["probe"],
+        "project_brief": context["project_brief"],
+        "script_supervisor": a1,
+    }
+    a2 = run_role("A2", _prompt("A2"), a2_context, None)
+    (edit_dir / "director.json").write_text(
+        json.dumps(a2, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    a3_context = {
+        "run_number": context["run_number"],
+        "_session_state_path": context["_session_state_path"],
+        "schema": context["schema"],
+        "takes_packed": context["takes_packed"],
+        "project_brief": context["project_brief"],
+        "director": a2,
+    }
+    a3 = run_role("A3", _prompt("A3"), a3_context, None)
     _debate(state, a2, a3)
     _apply_coverage(state, a2, a3, schema)
     state["meta"]["sources"] = [str(source) for source in all_sources]
@@ -457,10 +511,26 @@ def _validate_overlay_plan(
             raise ValueError(f"A6 template {template_id} does not match beat {beat}")
         start = float(overlay["start_in_output"])
         duration = float(overlay["duration"])
-        end = start + duration
-        if duration > float(scene["duration_s"]) + 1e-6:
-            raise ValueError(f"A6 overlay {slot_id} exceeds its scene duration")
         windows = [item for item in timeline if item["beat"] == beat]
+        containing_windows = [
+            item
+            for item in windows
+            if start >= float(item["start_in_output"]) - 1e-6
+            and start < float(item["end_in_output"]) - 1e-6
+        ]
+        if not containing_windows and windows:
+            window = min(
+                windows,
+                key=lambda item: abs(float(item["start_in_output"]) - start),
+            )
+            start = float(window["start_in_output"])
+            containing_windows = [window]
+        if containing_windows:
+            available = max(float(item["end_in_output"]) - start for item in containing_windows)
+            duration = min(duration, float(scene["duration_s"]), available)
+        end = start + duration
+        if duration <= 0:
+            raise ValueError(f"A6 overlay {slot_id} has no usable duration")
         if not any(
             start >= float(item["start_in_output"]) - 1e-6
             and end <= float(item["end_in_output"]) + 1e-6
@@ -480,6 +550,8 @@ def _validate_overlay_plan(
             if len(str(value)) > slots[key]:
                 raise ValueError(f"A6 overlay {slot_id} prop {key} exceeds max_chars")
         enriched = dict(overlay)
+        enriched["start_in_output"] = start
+        enriched["duration"] = duration
         enriched["scene"] = scene
         validated.append(enriched)
     ordered = sorted(validated, key=lambda item: float(item["start_in_output"]))
@@ -497,6 +569,8 @@ def _render_motion_job(
     overlay: dict[str, Any],
     props: dict[str, Any],
     target_size: tuple[int, int],
+    *,
+    resume: bool = False,
 ) -> dict[str, Any]:
     slot = materialize_scene(
         source,
@@ -507,13 +581,14 @@ def _render_motion_job(
         target_width=target_size[0],
         target_height=target_size[1],
     )
-    subprocess.run(
-        ["npm", "install", "--ignore-scripts", "--no-audit", "--no-fund"],
-        cwd=slot,
-        check=True,
-    )
     output = slot / "render.mov"
-    subprocess.run(build_render_command(slot, output), cwd=slot, check=True)
+    if not (resume and output.is_file()):
+        subprocess.run(
+            _npm_install_command(),
+            cwd=slot,
+            check=True,
+        )
+        subprocess.run(build_render_command(slot, output), cwd=slot, check=True)
     if not output.is_file():
         raise RuntimeError(f"Remotion did not create {output}")
     return {
@@ -526,12 +601,23 @@ def _render_motion_job(
     }
 
 
+def _npm_install_command() -> list[str]:
+    launcher = (
+        [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/s", "/c", "npm"]
+        if os.name == "nt"
+        else ["npm"]
+    )
+    return [*launcher, "install", "--ignore-scripts", "--no-audit", "--no-fund"]
+
+
 def _graphics_overlays(
     edit_dir: Path,
     state: dict[str, Any],
     ranges: list[dict[str, Any]],
     source: Path,
     target_size: tuple[int, int],
+    *,
+    resume: bool = False,
 ) -> list[dict[str, Any]]:
     catalog_path = edit_dir / "scene-catalog.json"
     catalog = build_scene_catalog(source, catalog_path)
@@ -546,7 +632,7 @@ def _graphics_overlays(
         "brand": state.get("brand", {}),
         "project_brief": state.get("meta", {}).get("brief", ""),
     }
-    plan = run_role("A6", _prompt("A6"), context, None)
+    plan = _cached_role(edit_dir, "A6", "A6", _prompt("A6"), context, resume=resume)
     overlays = _validate_overlay_plan(plan["overlays"], scenes, timeline)
     eligible_beats = {str(item["beat"]) for item in timeline} & {
         str(scene["type"]) for scene in scenes
@@ -563,35 +649,372 @@ def _graphics_overlays(
             "scene": overlay["scene"],
             "brand": state.get("brand", {}),
         }
-        checked = run_role("A6W", _prompt("A6W"), worker_context, None)
+        checked = _cached_role(
+            edit_dir,
+            f"A6W-{slot_id}",
+            "A6W",
+            _prompt("A6W"),
+            worker_context,
+            resume=resume,
+        )
         if checked["slot_id"] != slot_id or checked["template_id"] != overlay["template_id"]:
             raise ValueError(f"A6 slot worker changed the identity of {slot_id}")
         return _render_motion_job(
-            edit_dir, source, overlay, checked["props"], target_size
+            edit_dir,
+            source,
+            overlay,
+            checked["props"],
+            target_size,
+            resume=resume,
         )
 
     with ThreadPoolExecutor(max_workers=min(4, max(1, len(overlays)))) as executor:
         return list(executor.map(worker, overlays))
 
 
+_CHUNK_VARIANTS = (
+    {
+        "id": "a",
+        "label": "Version A",
+        "name": "Clean Cut",
+        "direction": (
+            "Prioritize clarity, natural pauses, and the strongest complete delivery. "
+            "Keep the pacing controlled and leave the speaker visually dominant."
+        ),
+        "motion": False,
+    },
+    {
+        "id": "b",
+        "label": "Version B",
+        "name": "Motion Cut",
+        "direction": (
+            "Build a tighter, more energetic alternative. Prefer concise phrasing and "
+            "leave clean visual room for an integrated UI or motion-graphics treatment."
+        ),
+        "motion": True,
+    },
+)
+
+
+def _chunk_groups(ranges: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    for item in ranges:
+        beat = str(item["beat"])
+        if groups and groups[-1]["beat"] == beat:
+            groups[-1]["seed_ranges"].append(item)
+            continue
+        slug = re.sub(r"[^a-z0-9]+", "-", beat.lower()).strip("-") or "segment"
+        groups.append(
+            {
+                "id": f"chunk-{len(groups):02d}-{slug}",
+                "order": len(groups),
+                "beat": beat,
+                "seed_ranges": [item],
+            }
+        )
+    return groups
+
+
+def _copy_chunk_transcripts(
+    edit_dir: Path, variant_dir: Path, ranges: list[dict[str, Any]]
+) -> None:
+    target = variant_dir / "transcripts"
+    target.mkdir(parents=True, exist_ok=True)
+    for source in {str(item["source"]) for item in ranges}:
+        transcript = edit_dir / "transcripts" / f"{source}.json"
+        if transcript.exists():
+            shutil.copy2(transcript, target / transcript.name)
+
+
+def _validate_chunk_ranges(
+    chunk: dict[str, Any], ranges: list[dict[str, Any]], source_map: dict[str, str]
+) -> list[dict[str, Any]]:
+    if not ranges:
+        raise ValueError(f"{chunk['id']} variant returned no ranges")
+    validated: list[dict[str, Any]] = []
+    for item in ranges:
+        if str(item.get("beat")) != str(chunk["beat"]):
+            raise ValueError(f"{chunk['id']} variant returned a different beat")
+        source = str(item.get("source"))
+        if source not in source_map:
+            raise ValueError(f"{chunk['id']} variant selected unknown source {source}")
+        start = float(item["start"])
+        end = float(item["end"])
+        if start < 0 or end <= start:
+            raise ValueError(f"{chunk['id']} variant returned an invalid range")
+        validated.append(dict(item))
+    return validated
+
+
+def _build_chunk_variant(
+    edit_dir: Path,
+    state: dict[str, Any],
+    chunk: dict[str, Any],
+    variant: dict[str, Any],
+    source_map: dict[str, str],
+    base_context: dict[str, Any],
+    motion_source: Path | None,
+    target_size: tuple[int, int],
+    *,
+    resume: bool,
+) -> dict[str, Any]:
+    variant_id = str(variant["id"])
+    variant_dir = edit_dir / "chunks" / str(chunk["id"]) / variant_id
+    director = base_context["director"]
+    beats = [
+        item
+        for item in director.get("beats", [])
+        if str(item.get("id")) == str(chunk["beat"])
+    ]
+    context = {
+        **base_context,
+        "_session_key": f"{chunk['id']}.{variant_id}",
+        "director": {
+            "beats": beats,
+            "beat_order": [chunk["beat"]],
+            "order_reason": "This agent edits one independently selectable chunk.",
+        },
+        "chunk": chunk,
+        "variant": {
+            "id": variant_id,
+            "name": variant["name"],
+            "direction": variant["direction"],
+        },
+    }
+    decision = _cached_role(
+        edit_dir,
+        f"A4-{chunk['id']}-{variant_id}",
+        "A4",
+        _prompt("A4"),
+        context,
+        resume=resume,
+    )
+    ranges = _validate_chunk_ranges(chunk, decision["ranges"], source_map)
+    overlays: list[dict[str, Any]] = []
+    if bool(variant["motion"]) and motion_source is not None:
+        overlays = _graphics_overlays(
+            variant_dir,
+            state,
+            ranges,
+            motion_source,
+            target_size,
+            resume=resume,
+        )
+    _copy_chunk_transcripts(edit_dir, variant_dir, ranges)
+    preview_edl = {
+        "sources": source_map,
+        "ranges": ranges,
+        "grade": state["brand"].get("grade", "neutral_punch"),
+        "overlays": overlays,
+        "subtitles": "master.srt",
+    }
+    _write_json(variant_dir / "edl.json", preview_edl)
+    preview = variant_dir / "preview.mp4"
+    if not (resume and preview.exists()):
+        render(variant_dir, preview, preview=True)
+    measured = probe(preview)
+    duration = sum(float(item["end"]) - float(item["start"]) for item in ranges)
+    final_overlays = []
+    for overlay in overlays:
+        item = dict(overlay)
+        item["file"] = str((variant_dir / str(overlay["file"])).resolve())
+        final_overlays.append(item)
+    return {
+        "id": variant_id,
+        "label": variant["label"],
+        "name": variant["name"],
+        "strategy": variant["direction"],
+        "status": "ready",
+        "duration_s": measured.duration_s,
+        "expected_duration_s": duration,
+        "ranges": ranges,
+        "overlays": final_overlays,
+        "preview": preview.relative_to(edit_dir).as_posix(),
+        "notes": str(decision.get("notes", "")),
+    }
+
+
+def build_chunk_variants(
+    edit_dir: Path,
+    sources: list[Path],
+    template_source: Path | None = None,
+    *,
+    resume: bool = False,
+) -> dict[str, Any]:
+    """Create two independently agent-edited previews for every semantic chunk."""
+    schema = _schema()
+    state = load(edit_dir, schema)
+    if not sources:
+        raise RuntimeError("no source videos available for chunking")
+    supervisor_path = edit_dir / "script-supervisor.json"
+    director_path = edit_dir / "director.json"
+    director = (
+        _read_json(director_path)
+        if director_path.exists()
+        else {
+            "beats": state["beats"],
+            "beat_order": [beat["id"] for beat in state["beats"]],
+        }
+    )
+    base_context = {
+        "run_number": int(state["meta"]["iteration"]),
+        "_session_state_path": str(edit_dir / "sessions.json"),
+        "schema": schema,
+        "director": director,
+        "script_supervisor": _read_json(supervisor_path) if supervisor_path.exists() else {},
+        "takes_packed": (edit_dir / "takes_packed.md").read_text(encoding="utf-8"),
+        "word_index": _read_json(edit_dir / "word_index.json"),
+    }
+    chunk_plan = _cached_role(
+        edit_dir,
+        "A4-chunk-plan",
+        "A4",
+        _prompt("A4"),
+        base_context,
+        resume=resume,
+    )
+    chunks = _chunk_groups(chunk_plan["ranges"])
+    if not chunks:
+        raise RuntimeError("A4 produced no semantic chunks")
+    source_map = {source.stem: str(source.resolve()) for source in sources}
+    first_source = probe(sources[0])
+    target_size = (1080, 1920) if first_source.height > first_source.width else (1920, 1080)
+    motion_source = _motion_source(template_source, state)
+    manifest: dict[str, Any] = {
+        "version": 1,
+        "status": "building",
+        "sources": source_map,
+        "chunks": [
+            {
+                "id": chunk["id"],
+                "order": chunk["order"],
+                "beat": chunk["beat"],
+                "selected": None,
+                "variants": [],
+            }
+            for chunk in chunks
+        ],
+    }
+    _write_json(edit_dir / "chunks.json", manifest)
+    jobs: dict[tuple[str, str], Any] = {}
+    with ThreadPoolExecutor(max_workers=min(4, len(chunks) * 2)) as executor:
+        for chunk in chunks:
+            for variant in _CHUNK_VARIANTS:
+                jobs[(str(chunk["id"]), str(variant["id"]))] = executor.submit(
+                    _build_chunk_variant,
+                    edit_dir,
+                    state,
+                    chunk,
+                    variant,
+                    source_map,
+                    base_context,
+                    motion_source,
+                    target_size,
+                    resume=resume,
+                )
+        for manifest_chunk in manifest["chunks"]:
+            manifest_chunk["variants"] = [
+                jobs[(str(manifest_chunk["id"]), str(variant["id"]))].result()
+                for variant in _CHUNK_VARIANTS
+            ]
+    manifest["status"] = "review"
+    _write_json(edit_dir / "chunks.json", manifest)
+    return manifest
+
+
+def finalize_chunk_variants(edit_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Render the final timeline from the variant selected for every chunk."""
+    manifest_path = edit_dir / "chunks.json"
+    manifest = _read_json(manifest_path)
+    chunks = manifest.get("chunks", [])
+    if not chunks:
+        raise RuntimeError("no chunk variants are available")
+    ranges: list[dict[str, Any]] = []
+    overlays: list[dict[str, Any]] = []
+    offset = 0.0
+    for chunk in chunks:
+        selected_id = chunk.get("selected")
+        selected = next(
+            (item for item in chunk.get("variants", []) if item.get("id") == selected_id),
+            None,
+        )
+        if selected is None:
+            raise RuntimeError(f"{chunk.get('id')} has no selected variant")
+        selected_ranges = [dict(item) for item in selected.get("ranges", [])]
+        ranges.extend(selected_ranges)
+        for overlay in selected.get("overlays", []):
+            item = dict(overlay)
+            item["start_in_output"] = offset + float(item["start_in_output"])
+            overlays.append(item)
+        offset += sum(
+            float(item["end"]) - float(item["start"]) for item in selected_ranges
+        )
+    state = load(edit_dir, _schema())
+    edl = {
+        "sources": manifest["sources"],
+        "ranges": ranges,
+        "grade": state["brand"].get("grade", "neutral_punch"),
+        "overlays": overlays,
+        "subtitles": "master.srt",
+    }
+    manifest["status"] = "finalizing"
+    _write_json(manifest_path, manifest)
+    _write_json(edit_dir / "edl.json", edl)
+    output = edit_dir / "final.mp4"
+    render(edit_dir, output)
+    result = probe(output)
+    expected_total = sum(float(item["end"]) - float(item["start"]) for item in ranges)
+    qc_context = {
+        "_session_state_path": str(edit_dir / "sessions.json"),
+        "probe": _probe_context(result),
+        "duration_check": _duration_check(expected_total, result.duration_s),
+        "audio_check": _audio_check(output, ranges),
+        "edl": edl,
+        "timeline_views": _timeline_views(output, ranges, edit_dir),
+        "subtitle_file": str(edit_dir / "master.srt"),
+    }
+    qc = _normalize_qc_verdict(run_role("A7", _prompt("A7"), qc_context, None))
+    _write_json(edit_dir / "qc.json", qc)
+    manifest["status"] = "done"
+    _write_json(manifest_path, manifest)
+    return edl, qc
+
+
 def cut(
-    edit_dir: Path, sources: list[Path], template_source: Path | None = None
+    edit_dir: Path,
+    sources: list[Path],
+    template_source: Path | None = None,
+    *,
+    force: bool = False,
+    resume: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     schema = _schema()
     state = load(edit_dir, schema)
     allowed, notes = gate(state, schema)
-    if not allowed:
+    if not allowed and not force:
         raise RuntimeError(
             json.dumps({"gate": "blocked", "director_notes": notes}, ensure_ascii=False)
         )
-    context = _context(edit_dir, schema, state, int(state["meta"]["iteration"]))
-    a4 = run_role("A4", _prompt("A4"), context, None)
+    supervisor_path = edit_dir / "script-supervisor.json"
+    director_path = edit_dir / "director.json"
+    context = {
+        "run_number": int(state["meta"]["iteration"]),
+        "_session_state_path": str(edit_dir / "sessions.json"),
+        "schema": schema,
+        "director": (
+            _read_json(director_path)
+            if director_path.exists()
+            else {
+                "beats": state["beats"],
+                "beat_order": [beat["id"] for beat in state["beats"]],
+            }
+        ),
+        "script_supervisor": _read_json(supervisor_path) if supervisor_path.exists() else {},
+        "takes_packed": (edit_dir / "takes_packed.md").read_text(encoding="utf-8"),
+        "word_index": _read_json(edit_dir / "word_index.json"),
+    }
+    a4 = _cached_role(edit_dir, "A4", "A4", _prompt("A4"), context, resume=resume)
     motion_source = _motion_source(template_source, state)
-    if motion_source is None:
-        raise RuntimeError(
-            "motion template source required; pass --template-source or set "
-            "PALANTUM_TEMPLATE_SOURCE"
-        )
     if not sources:
         raise RuntimeError("no source videos available for cutting")
     first_source = probe(sources[0])
@@ -601,12 +1024,23 @@ def cut(
         "sources": source_map,
         "ranges": a4["ranges"],
         "grade": state["brand"].get("grade", "neutral_punch"),
-        "overlays": _graphics_overlays(
-            edit_dir, state, a4["ranges"], motion_source, target_size
+        "overlays": (
+            _graphics_overlays(
+                edit_dir,
+                state,
+                a4["ranges"],
+                motion_source,
+                target_size,
+                resume=resume,
+            )
+            if motion_source is not None
+            else []
         ),
         "subtitles": "master.srt",
     }
-    (edit_dir / "edl.json").write_text(json.dumps(edl, indent=2, ensure_ascii=False))
+    (edit_dir / "edl.json").write_text(
+        json.dumps(edl, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     output = edit_dir / "final.mp4"
     render(edit_dir, output)
     result = probe(output)
@@ -625,12 +1059,30 @@ def cut(
     if a7.get("verdict") == "fail":
         retry_context = dict(context)
         retry_context["qc_findings"] = a7
-        a4 = run_role("A4", _prompt("A4"), retry_context, None)
-        edl["ranges"] = a4["ranges"]
-        edl["overlays"] = _graphics_overlays(
-            edit_dir, state, a4["ranges"], motion_source, target_size
+        a4 = _cached_role(
+            edit_dir,
+            "A4-retry",
+            "A4",
+            _prompt("A4"),
+            retry_context,
+            resume=resume,
         )
-        (edit_dir / "edl.json").write_text(json.dumps(edl, indent=2, ensure_ascii=False))
+        edl["ranges"] = a4["ranges"]
+        edl["overlays"] = (
+            _graphics_overlays(
+                edit_dir,
+                state,
+                a4["ranges"],
+                motion_source,
+                target_size,
+                resume=resume,
+            )
+            if motion_source is not None
+            else []
+        )
+        (edit_dir / "edl.json").write_text(
+            json.dumps(edl, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         render(edit_dir, output)
         result = probe(output)
         qc_context["probe"] = _probe_context(result)
@@ -641,5 +1093,7 @@ def cut(
         qc_context["audio_check"] = _audio_check(output, edl["ranges"])
         qc_context["timeline_views"] = _timeline_views(output, a4["ranges"], edit_dir)
         a7 = _normalize_qc_verdict(run_role("A7", _prompt("A7"), qc_context, None))
-    (edit_dir / "qc.json").write_text(json.dumps(a7, indent=2, ensure_ascii=False))
+    (edit_dir / "qc.json").write_text(
+        json.dumps(a7, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     return edl, a7

@@ -13,7 +13,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from palantum.export import export_project
-from palantum.orchestrator import _schema, analyze, cut, gate
+from palantum.orchestrator import (
+    _schema,
+    analyze,
+    build_chunk_variants,
+    finalize_chunk_variants,
+)
 from palantum.state import load
 from palantum.web.script import create_script_stream
 
@@ -30,6 +35,10 @@ _LOCK = threading.Lock()
 
 class ScriptRequest(BaseModel):
     prompt: str
+
+
+class ChunkSelection(BaseModel):
+    variant_id: str
 
 
 def _job_path(edit_dir: Path) -> Path:
@@ -54,6 +63,65 @@ def _job(edit_dir: Path) -> dict[str, Any]:
     except (OSError, TypeError, ValueError):
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def _chunks_path(edit_dir: Path) -> Path:
+    return edit_dir / "chunks.json"
+
+
+def _read_chunks(edit_dir: Path) -> dict[str, Any]:
+    path = _chunks_path(edit_dir)
+    if not path.exists():
+        return {}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _write_chunks(edit_dir: Path, payload: dict[str, Any]) -> None:
+    path = _chunks_path(edit_dir)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    temporary.replace(path)
+
+
+def _chunk_payload(edit_dir: Path) -> list[dict[str, Any]]:
+    manifest = _read_chunks(edit_dir)
+    result: list[dict[str, Any]] = []
+    for chunk in manifest.get("chunks", []):
+        if not isinstance(chunk, dict):
+            continue
+        chunk_id = str(chunk.get("id", ""))
+        variants = []
+        for variant in chunk.get("variants", []):
+            if not isinstance(variant, dict):
+                continue
+            variant_id = str(variant.get("id", ""))
+            variants.append(
+                {
+                    "id": variant_id,
+                    "label": str(variant.get("label", variant_id)),
+                    "name": str(variant.get("name", "")),
+                    "strategy": str(variant.get("strategy", "")),
+                    "status": str(variant.get("status", "ready")),
+                    "duration_s": float(variant.get("duration_s", 0)),
+                    "video_url": f"/api/chunks/{chunk_id}/variants/{variant_id}/video",
+                }
+            )
+        result.append(
+            {
+                "id": chunk_id,
+                "order": int(chunk.get("order", len(result))),
+                "beat": str(chunk.get("beat", "")),
+                "selected": chunk.get("selected"),
+                "variants": variants,
+            }
+        )
+    return sorted(result, key=lambda item: item["order"])
 
 
 def _failure_message(error: Exception) -> str:
@@ -112,10 +180,13 @@ def state_payload(videos_dir: Path) -> dict[str, Any]:
     )
     final = edit_dir / "final.mp4"
     job_status = str(job.get("status", ""))
+    chunks = _chunk_payload(edit_dir)
     if job_status == "failed":
         phase = "error"
-    elif job_status in {"queued", "running"}:
+    elif job_status in {"queued", "running", "finalizing"}:
         phase = "working"
+    elif job_status == "review":
+        phase = "review"
     elif not has_sources:
         phase = "empty"
     elif final.exists():
@@ -148,6 +219,9 @@ def state_payload(videos_dir: Path) -> dict[str, Any]:
         "video_url": "/api/video" if final.exists() else None,
         "export_url": "/api/export" if final.exists() else None,
         "error": job.get("error") if phase == "error" else None,
+        "chunks": chunks,
+        "selection_complete": bool(chunks)
+        and all(chunk.get("selected") for chunk in chunks),
     }
 
 
@@ -161,18 +235,25 @@ def _process_upload(
         edit_dir = videos_dir / "edit"
         _write_job(edit_dir, "running")
         try:
-            for source in sources:
-                analyze(edit_dir, [source], template_source, brief=brief)
+            analyze(edit_dir, sources, template_source, brief=brief)
             state = load(edit_dir, _schema())
-            allowed, _ = gate(state, _schema())
-            if allowed:
-                all_sources = sorted(videos_dir.glob("*.mp4")) + sorted(
-                    videos_dir.glob("*.mov")
-                )
-                cut(edit_dir, all_sources, template_source)
-                _write_job(edit_dir, "done")
-            else:
-                _write_job(edit_dir, "waiting")
+            all_sources = [
+                Path(str(value)).resolve()
+                for value in state.get("meta", {}).get("sources", [])
+            ]
+            build_chunk_variants(edit_dir, all_sources, template_source)
+            _write_job(edit_dir, "review")
+        except Exception as error:
+            _write_job(edit_dir, "failed", _failure_message(error))
+
+
+def _finalize_selection(videos_dir: Path) -> None:
+    with _LOCK:
+        edit_dir = videos_dir / "edit"
+        _write_job(edit_dir, "finalizing")
+        try:
+            finalize_chunk_variants(edit_dir)
+            _write_job(edit_dir, "done")
         except Exception as error:
             _write_job(edit_dir, "failed", _failure_message(error))
 
@@ -222,6 +303,76 @@ def create_app(
             media_type="text/plain; charset=utf-8",
             headers={"X-Palantum-Generator": generator},
         )
+
+    @app.post("/api/chunks/{chunk_id}/selection")
+    def api_select_chunk(chunk_id: str, request: ChunkSelection) -> dict[str, Any]:
+        edit_dir = root / "edit"
+        with _LOCK:
+            manifest = _read_chunks(edit_dir)
+            chunk = next(
+                (item for item in manifest.get("chunks", []) if item.get("id") == chunk_id),
+                None,
+            )
+            if chunk is None:
+                raise HTTPException(status_code=404, detail="chunk not found")
+            variant = next(
+                (
+                    item
+                    for item in chunk.get("variants", [])
+                    if item.get("id") == request.variant_id
+                ),
+                None,
+            )
+            if variant is None:
+                raise HTTPException(status_code=404, detail="variant not found")
+            chunk["selected"] = request.variant_id
+            _write_chunks(edit_dir, manifest)
+        return {
+            "chunk_id": chunk_id,
+            "selected": request.variant_id,
+            "selection_complete": all(
+                item.get("selected") for item in manifest.get("chunks", [])
+            ),
+        }
+
+    @app.get("/api/chunks/{chunk_id}/variants/{variant_id}/video")
+    def api_chunk_video(chunk_id: str, variant_id: str) -> FileResponse:
+        edit_dir = root / "edit"
+        manifest = _read_chunks(edit_dir)
+        chunk = next(
+            (item for item in manifest.get("chunks", []) if item.get("id") == chunk_id),
+            None,
+        )
+        variant = next(
+            (
+                item
+                for item in (chunk or {}).get("variants", [])
+                if item.get("id") == variant_id
+            ),
+            None,
+        )
+        if variant is None:
+            raise HTTPException(status_code=404, detail="variant not found")
+        preview = edit_dir / str(variant.get("preview", ""))
+        if not preview.is_file():
+            raise HTTPException(status_code=404, detail="variant preview is not ready")
+        return FileResponse(preview, media_type="video/mp4")
+
+    @app.post("/api/finalize")
+    def api_finalize() -> JSONResponse:
+        edit_dir = root / "edit"
+        manifest = _read_chunks(edit_dir)
+        chunks = manifest.get("chunks", [])
+        if not chunks or not all(item.get("selected") for item in chunks):
+            raise HTTPException(
+                status_code=409, detail="select one variant for every chunk first"
+            )
+        with _LOCK:
+            if str(_job(edit_dir).get("status")) in {"queued", "finalizing"}:
+                raise HTTPException(status_code=409, detail="final render already running")
+            _write_job(edit_dir, "queued")
+        _EXECUTOR.submit(_finalize_selection, root)
+        return JSONResponse({"phase": "working"}, status_code=202)
 
     @app.get("/api/video")
     def api_video() -> FileResponse:

@@ -14,6 +14,27 @@ ANSI_BOLD = "\033[1m"
 ANSI_RESET = "\033[0m"
 
 
+def _confirm_rough_cut() -> bool:
+    try:
+        answer = input("Required beats are missing. Start a rough cut anyway? [y/N] ")
+    except (EOFError, OSError):
+        return False
+    return answer.strip().lower() in {"y", "yes", "j", "ja"}
+
+
+def _cut_sources(videos_dir: Path, state: dict[str, object]) -> list[Path]:
+    meta = state.get("meta")
+    if isinstance(meta, dict):
+        recorded = meta.get("sources")
+        if isinstance(recorded, list) and recorded:
+            return [
+                Path(value).resolve()
+                for value in recorded
+                if isinstance(value, str) and Path(value).suffix.lower() in {".mp4", ".mov"}
+            ]
+    return sorted(videos_dir.glob("*.mp4")) + sorted(videos_dir.glob("*.mov"))
+
+
 def _dots(state: dict[str, object]) -> str:
     raw_beats = state["beats"]
     if not isinstance(raw_beats, list):
@@ -50,6 +71,16 @@ def main() -> None:
     commands.add_parser("status")
     cut_command = commands.add_parser("cut")
     cut_command.add_argument("--template-source", type=Path)
+    cut_command.add_argument(
+        "--force",
+        action="store_true",
+        help="start a rough cut even when required beats are missing",
+    )
+    cut_command.add_argument(
+        "--resume",
+        action="store_true",
+        help="reuse validated Cutter and Motion role outputs from a failed render",
+    )
     commands.add_parser("export")
     doctor_command = commands.add_parser("doctor")
     doctor_command.add_argument("--template-source", type=Path)
@@ -100,12 +131,20 @@ def main() -> None:
             create_app(videos_dir, args.template_source), host=args.host, port=args.port
         )
         return
-    sources = sorted(videos_dir.glob("*.mp4")) + sorted(videos_dir.glob("*.mov"))
     state = load(edit_dir, schema)
+    sources = _cut_sources(videos_dir, state)
     allowed, notes = gate(state, schema)
     if not allowed:
         print_state(state)
-        raise SystemExit(2)
-    edl, qc = cut(edit_dir, sources, args.template_source)
+        if not args.force and not _confirm_rough_cut():
+            raise SystemExit(2)
+        print("\nStarting a rough cut with the available footage.")
+    edl, qc = cut(
+        edit_dir,
+        sources,
+        args.template_source,
+        force=not allowed,
+        resume=args.resume,
+    )
     print(f"Rendered {edit_dir / 'final.mp4'}")
     print(json.dumps(qc, indent=2, ensure_ascii=False))
