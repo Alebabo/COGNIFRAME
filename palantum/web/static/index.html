@@ -13,9 +13,15 @@
     --border: #e8e8e8;
     --soft: #f8f9fa;
     --director: #8b5cf6;
+    --director-bg: #f5f3ff;
+    --director-border: #ddd6fe;
     --strategist: #f59e0b;
+    --strategist-bg: #fffbeb;
+    --strategist-border: #fde68a;
     --supervisor: #3b82f6;
-    --ghost: #9ca3af;
+    --supervisor-bg: #eff6ff;
+    --supervisor-border: #bfdbfe;
+    --ghost: #6b7280;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -40,7 +46,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 32px;
-    background: rgba(255,255,255,0.92);
+    background: rgba(255,255,255,0.94);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
     z-index: 100;
@@ -185,51 +191,6 @@
     width: 100%;
   }
 
-  /* In-Canvas Ghost-Text Backdrop */
-  .ghost-backdrop {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    font-family: inherit;
-    font-size: 24px;
-    line-height: 1.55;
-    letter-spacing: -0.015em;
-    color: transparent;
-    pointer-events: none;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    overflow: hidden;
-    padding: 0;
-    margin: 0;
-    user-select: none;
-  }
-  .ghost-match-text {
-    color: transparent;
-  }
-  .ghost-suggested-text {
-    color: var(--ghost);
-    font-style: italic;
-    opacity: 0.85;
-    transition: opacity 180ms ease;
-  }
-  .ghost-tab-hint {
-    display: inline-block;
-    font-style: normal;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    background: #f3f4f6;
-    color: #6b7280;
-    border: 1px solid #e5e7eb;
-    border-radius: 3px;
-    padding: 1px 4px;
-    margin-left: 6px;
-    vertical-align: middle;
-  }
-
   .prompt {
     position: relative;
     width: 100%;
@@ -305,65 +266,119 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.12);
   }
 
-  /* Compact Dismissable Missing Content Badge */
-  .cursor-badge {
+  /* Agent Anchored Verbatim Card */
+  .agent-verbatim-card {
     margin-top: 6px;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px;
     background: #ffffff;
     border: 1px solid var(--border);
-    border-radius: 16px;
-    font-size: 11px;
-    color: var(--ink);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    max-width: 290px;
-    white-space: nowrap;
-    animation: popIn 200ms ease both;
-    cursor: default;
-    user-select: none;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    max-width: 380px;
+    animation: popIn 220ms ease both;
+    pointer-events: auto;
+    z-index: 30;
   }
   @keyframes popIn {
-    from { opacity: 0; transform: translateY(4px) scale(0.96); }
+    from { opacity: 0; transform: translateY(6px) scale(0.96); }
     to { opacity: 1; transform: translateY(0) scale(1); }
   }
-  .badge-icon {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
+  .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
-  .badge-text {
+  .card-identity {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .card-missing-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: #f3f4f6;
+    color: #4b5563;
     font-weight: 500;
-    color: #374151;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
-  .badge-dismiss {
+  .card-dismiss {
     border: none;
     background: transparent;
     color: var(--muted);
-    font-size: 14px;
+    font-size: 15px;
     line-height: 1;
     cursor: pointer;
     padding: 0 2px;
-    margin-left: 2px;
+    border-radius: 3px;
+    transition: color 150ms ease, background 150ms ease;
   }
-  .badge-dismiss:hover { color: var(--ink); }
+  .card-dismiss:hover { color: var(--ink); background: #f3f4f6; }
+  
+  .card-verbatim-body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--soft);
+    padding: 6px 10px;
+    border-radius: 6px;
+    border-left: 3px solid var(--ink);
+  }
+  .verbatim-text {
+    font-size: 13px;
+    font-style: italic;
+    color: var(--ghost);
+    line-height: 1.4;
+    word-break: break-word;
+    flex: 1;
+  }
+  .verbatim-tab-btn {
+    border: 1px solid var(--border);
+    background: #ffffff;
+    color: var(--ink);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    transition: background 150ms ease, transform 150ms ease;
+  }
+  .verbatim-tab-btn:hover {
+    background: var(--ink);
+    color: #ffffff;
+    border-color: var(--ink);
+    transform: translateY(-1px);
+  }
 
-  /* Specific Agent Cursor Themes */
+  /* Agent Theme Colors */
   .agent-cursor.director .cursor-caret { background: var(--director); }
   .agent-cursor.director .cursor-tag { background: var(--director); }
-  .agent-cursor.director .badge-icon { background: var(--director); }
+  .agent-cursor.director .card-identity { color: var(--director); }
+  .agent-cursor.director .card-verbatim-body { border-left-color: var(--director); background: var(--director-bg); }
+  .agent-cursor.director .verbatim-text { color: #6d28d9; }
 
   .agent-cursor.strategist .cursor-caret { background: var(--strategist); }
   .agent-cursor.strategist .cursor-tag { background: var(--strategist); }
-  .agent-cursor.strategist .badge-icon { background: var(--strategist); }
+  .agent-cursor.strategist .card-identity { color: var(--strategist); }
+  .agent-cursor.strategist .card-verbatim-body { border-left-color: var(--strategist); background: var(--strategist-bg); }
+  .agent-cursor.strategist .verbatim-text { color: #b45309; }
 
   .agent-cursor.supervisor .cursor-caret { background: var(--supervisor); }
   .agent-cursor.supervisor .cursor-tag { background: var(--supervisor); }
-  .agent-cursor.supervisor .badge-icon { background: var(--supervisor); }
+  .agent-cursor.supervisor .card-identity { color: var(--supervisor); }
+  .agent-cursor.supervisor .card-verbatim-body { border-left-color: var(--supervisor); background: var(--supervisor-bg); }
+  .agent-cursor.supervisor .verbatim-text { color: #1d4ed8; }
 
   /* Offscreen Mirror for coordinate calculation */
   #mirror {
@@ -654,7 +669,7 @@
   @media (max-width: 680px) {
     .topbar { padding: 0 16px; }
     main { width: calc(100% - 32px); padding-top: 96px; }
-    .prompt, .ghost-backdrop { font-size: 20px; }
+    .prompt { font-size: 20px; }
     .toolbar { padding: 0 16px; }
     .actions { grid-template-columns: repeat(2, 1fr); }
   }
@@ -702,40 +717,64 @@
 
 <main>
   <div class="canvas-wrapper">
-    <!-- Synchronized In-Canvas Ghost Text Layer -->
-    <div id="ghost-backdrop" class="ghost-backdrop" aria-hidden="true">
-      <span id="ghost-typed" class="ghost-match-text"></span><span id="ghost-preview" class="ghost-suggested-text"></span><span id="ghost-hint" class="ghost-tab-hint" hidden>Tab</span>
-    </div>
-
     <textarea id="prompt" class="prompt" aria-label="Beschreibe dein Video" placeholder="Was möchtest du erzählen? Schreibe frei drauflos..."></textarea>
     
-    <!-- Collaborative Dynamic Cursors Layer -->
+    <!-- Collaborative Dynamic Cursors Layer with Anchored Verbatim Cards -->
     <div class="cursors-layer" id="cursors-layer">
+      <!-- Director Cursor & Card -->
       <div id="cursor-director" class="agent-cursor director">
         <div class="cursor-caret"></div>
         <span class="cursor-tag">Director</span>
-        <div id="badge-director" class="cursor-badge" hidden>
-          <span class="badge-icon"></span>
-          <span class="badge-text" id="badgetext-director"></span>
-          <button type="button" class="badge-dismiss" onclick="dismissMissing('director')">×</button>
+        <div id="card-director" class="agent-verbatim-card" hidden>
+          <div class="card-top">
+            <div class="card-identity">
+              <span>🟣 Director</span>
+              <span class="card-missing-badge" id="missing-director">Hook</span>
+            </div>
+            <button type="button" class="card-dismiss" title="Hinweis verwerfen" onclick="dismissAgent(event, 'director')">×</button>
+          </div>
+          <div class="card-verbatim-body">
+            <span class="verbatim-text" id="verbatim-director"></span>
+            <button type="button" class="verbatim-tab-btn" onclick="applyAgentGhost('director')">Tab ↵</button>
+          </div>
         </div>
       </div>
+
+      <!-- Strategist Cursor & Card -->
       <div id="cursor-strategist" class="agent-cursor strategist">
         <div class="cursor-caret"></div>
         <span class="cursor-tag">Strategist</span>
-        <div id="badge-strategist" class="cursor-badge" hidden>
-          <span class="badge-icon"></span>
-          <span class="badge-text" id="badgetext-strategist"></span>
-          <button type="button" class="badge-dismiss" onclick="dismissMissing('strategist')">×</button>
+        <div id="card-strategist" class="agent-verbatim-card" hidden>
+          <div class="card-top">
+            <div class="card-identity">
+              <span>🟠 Strategist</span>
+              <span class="card-missing-badge" id="missing-strategist">KPIs</span>
+            </div>
+            <button type="button" class="card-dismiss" title="Hinweis verwerfen" onclick="dismissAgent(event, 'strategist')">×</button>
+          </div>
+          <div class="card-verbatim-body">
+            <span class="verbatim-text" id="verbatim-strategist"></span>
+            <button type="button" class="verbatim-tab-btn" onclick="applyAgentGhost('strategist')">Tab ↵</button>
+          </div>
         </div>
       </div>
+
+      <!-- Supervisor Cursor & Card -->
       <div id="cursor-supervisor" class="agent-cursor supervisor">
         <div class="cursor-caret"></div>
         <span class="cursor-tag">Supervisor</span>
-        <div id="badge-supervisor" class="cursor-badge" hidden>
-          <span class="badge-icon"></span>
-          <span class="badge-text" id="badgetext-supervisor"></span>
-          <button type="button" class="badge-dismiss" onclick="dismissMissing('supervisor')">×</button>
+        <div id="card-supervisor" class="agent-verbatim-card" hidden>
+          <div class="card-top">
+            <div class="card-identity">
+              <span>🔵 Supervisor</span>
+              <span class="card-missing-badge" id="missing-supervisor">CTA</span>
+            </div>
+            <button type="button" class="card-dismiss" title="Hinweis verwerfen" onclick="dismissAgent(event, 'supervisor')">×</button>
+          </div>
+          <div class="card-verbatim-body">
+            <span class="verbatim-text" id="verbatim-supervisor"></span>
+            <button type="button" class="verbatim-tab-btn" onclick="applyAgentGhost('supervisor')">Tab ↵</button>
+          </div>
         </div>
       </div>
     </div>
@@ -811,10 +850,14 @@ const state = {
   uploading: false,
   recognition: null,
   typingTimeout: null,
-  assistDebounce: null,
+  orchestrateDebounce: null,
   dismissed: {},
-  currentGhostSuggestion: '',
-  ghostTargetPattern: '',
+  agentGhosts: {
+    director: '',
+    strategist: '',
+    supervisor: '',
+  },
+  activeRecommendations: [],
 };
 
 // Check Devin / Backend config on initial load
@@ -828,19 +871,20 @@ async function checkInitialConfig() {
         $('orchestrator-status').style.background = '#dcfce7';
         $('orchestrator-status').style.borderColor = '#bbf7d0';
         $('orchestrator-status').style.color = '#166534';
+      } else if (cfg.openai_configured) {
+        $('orchestrator-status').textContent = 'Aktiv (AI)';
+        $('orchestrator-status').style.background = '#eff6ff';
+        $('orchestrator-status').style.borderColor = '#bfdbfe';
+        $('orchestrator-status').style.color = '#1d4ed8';
       }
     }
   } catch (_) {}
 }
 
-// Autosize textarea & sync backdrop
+// Autosize textarea
 function autosize(el) {
   el.style.height = 'auto';
-  const newHeight = `${Math.max(el.id === 'prompt' ? 220 : 280, el.scrollHeight)}px`;
-  el.style.height = newHeight;
-  if (el.id === 'prompt') {
-    $('ghost-backdrop').style.height = newHeight;
-  }
+  el.style.height = `${Math.max(el.id === 'prompt' ? 220 : 280, el.scrollHeight)}px`;
   updateMirrorDimensions();
 }
 
@@ -878,193 +922,155 @@ function getWordCoordinates(charIndex) {
   };
 }
 
-// In-Canvas Ghost-Text rendering
-function setGhostText(suggestion, targetPattern = '') {
-  const text = $('prompt').value;
-  state.currentGhostSuggestion = suggestion || '';
-  state.ghostTargetPattern = targetPattern || '';
-
-  $('ghost-typed').textContent = text;
-  if (suggestion && text.trim().length >= 15) {
-    $('ghost-preview').textContent = ` ${suggestion}`;
-    $('ghost-hint').hidden = false;
-  } else {
-    $('ghost-preview').textContent = '';
-    $('ghost-hint').hidden = true;
+// Dismiss an agent's suggestion
+function dismissAgent(event, agentKey) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
   }
+  state.dismissed[agentKey] = true;
+  const card = $(`card-${agentKey}`);
+  if (card) card.hidden = true;
 }
 
-// Commit ghost text into canvas prompt
-function acceptGhostText() {
-  if (!state.currentGhostSuggestion) return false;
+// Apply verbatim suggestion into prompt
+function applyAgentGhost(agentKey) {
+  const ghost = state.agentGhosts[agentKey];
+  if (!ghost) return;
   const prompt = $('prompt');
-  const text = prompt.value;
-  const suggestion = state.currentGhostSuggestion;
+  let current = prompt.value.trim();
 
-  if (state.ghostTargetPattern) {
-    const reg = new RegExp(state.ghostTargetPattern, 'i');
-    if (reg.test(text)) {
-      prompt.value = text.replace(reg, suggestion);
-    } else {
-      prompt.value = text.trim() ? `${text.trim()} ${suggestion}` : suggestion;
-    }
+  // If greeting in first line and director suggestion, replace greeting
+  if (agentKey === 'director' && /^(hallo|hi|herzlich willkommen[,\s]*|mein name ist[^\.]*\.)\s*/i.test(current)) {
+    prompt.value = current.replace(/^(hallo|hi|herzlich willkommen[,\s]*|mein name ist[^\.]*\.)\s*/i, `${ghost} `);
+  } else if (agentKey === 'supervisor' || agentKey === 'strategist') {
+    // Append or insert intelligently
+    prompt.value = current ? `${current}\n\n${ghost}` : ghost;
   } else {
-    prompt.value = text.trim() ? `${text.trim()} ${suggestion}` : suggestion;
+    prompt.value = current ? `${current} ${ghost}` : ghost;
   }
 
-  setGhostText('');
+  // Dismiss this agent's card once accepted
+  state.dismissed[agentKey] = true;
+  $(`card-${agentKey}`).hidden = true;
   updateComposer(true);
   prompt.focus();
-  return true;
 }
 
-// Handle Tab key for ghost text completion
+// Keyboard shortcut: Tab accepts the primary visible agent suggestion
 $('prompt').addEventListener('keydown', event => {
-  if (event.key === 'Tab' && state.currentGhostSuggestion) {
-    event.preventDefault();
-    acceptGhostText();
+  if (event.key === 'Tab') {
+    // Check which agent card is currently visible
+    for (const key of ['director', 'strategist', 'supervisor']) {
+      const card = $(`card-${key}`);
+      if (card && !card.hidden && state.agentGhosts[key]) {
+        event.preventDefault();
+        applyAgentGhost(key);
+        return;
+      }
+    }
   }
 });
 
-// Natural Agent Cursors positioning & Devin Orchestrator query
-function updateAgentCursors() {
+// Position cursors and update agent cards based on real LLM evaluation
+function renderAgentRecommendations() {
   const text = $('prompt').value;
   const cDirector = $('cursor-director');
   const cStrategist = $('cursor-strategist');
   const cSupervisor = $('cursor-supervisor');
 
+  const cardDirector = $('card-director');
+  const cardStrategist = $('card-strategist');
+  const cardSupervisor = $('card-supervisor');
+
   const sDirector = $('status-director');
   const sStrategist = $('status-strategist');
   const sSupervisor = $('status-supervisor');
 
-  // Text too short: Keep canvas clean and calm
-  if (!text.trim() || text.length < 20) {
+  if (!text.trim() || text.length < 15) {
     cDirector.classList.remove('visible');
     cStrategist.classList.remove('visible');
     cSupervisor.classList.remove('visible');
+    cardDirector.hidden = true;
+    cardStrategist.hidden = true;
+    cardSupervisor.hidden = true;
     if (sDirector) sDirector.textContent = 'bereit';
     if (sStrategist) sStrategist.textContent = 'bereit';
     if (sSupervisor) sSupervisor.textContent = 'bereit';
-    setGhostText('');
     return;
   }
 
   updateMirrorDimensions();
 
   const sentences = text.split(/(?<=[.?!])\s+/).filter(Boolean);
+  const recs = state.activeRecommendations || [];
 
-  // 1. Director: Appears when opening hook is formed (>= 20 chars)
+  // Match recommendations for each agent
+  const recDir = recs.find(r => r.agent === 'A2' || (r.role && r.role.toLowerCase().includes('director')));
+  const recStrat = recs.find(r => r.agent === 'A3' || (r.role && r.role.toLowerCase().includes('strateg')));
+  const recSuper = recs.find(r => r.agent === 'A1' || (r.role && r.role.toLowerCase().includes('supervisor')));
+
+  // 1. Director: Anchored to 1st sentence / Hook
   const firstSentenceEnd = text.indexOf('.') !== -1 ? text.indexOf('.') : Math.min(35, text.length);
-  const posDirector = getWordCoordinates(firstSentenceEnd);
-  cDirector.style.transform = `translate(${posDirector.left}px, ${posDirector.top}px)`;
+  const posDir = getWordCoordinates(firstSentenceEnd);
+  cDirector.style.transform = `translate(${posDir.left}px, ${posDir.top}px)`;
   cDirector.classList.add('visible');
-  if (sDirector) sDirector.textContent = 'analysiert Hook';
+  if (sDirector) sDirector.textContent = 'Hook analysiert';
 
-  // 2. Strategist: Appears when text reaches problem / metrics (>= 60 chars)
-  if (text.length >= 60) {
+  if (recDir && !state.dismissed['director'] && recDir.ghost_text) {
+    $('missing-director').textContent = recDir.missing_item || 'Hook & Nutzen';
+    $('verbatim-director').textContent = `"${recDir.ghost_text}"`;
+    state.agentGhosts['director'] = recDir.ghost_text;
+    cardDirector.hidden = false;
+  } else {
+    cardDirector.hidden = true;
+  }
+
+  // 2. Strategist: Anchored to middle or 2nd sentence (>= 50 chars)
+  if (text.length >= 50) {
     let stratChar = Math.floor(text.length * 0.5);
-    const numMatch = text.search(/\d+/);
-    if (numMatch !== -1) {
-      stratChar = numMatch;
-    } else if (sentences.length > 1) {
+    if (sentences.length > 1) {
       stratChar = text.indexOf(sentences[1]) + Math.min(25, sentences[1].length);
     }
-    const posStrategist = getWordCoordinates(stratChar);
-    cStrategist.style.transform = `translate(${posStrategist.left}px, ${posStrategist.top}px)`;
+    const posStrat = getWordCoordinates(stratChar);
+    cStrategist.style.transform = `translate(${posStrat.left}px, ${posStrat.top}px)`;
     cStrategist.classList.add('visible');
-    if (sStrategist) sStrategist.textContent = 'prüft Fakten';
+    if (sStrategist) sStrategist.textContent = 'Story & KPIs geprüft';
+
+    if (recStrat && !state.dismissed['strategist'] && recStrat.ghost_text) {
+      $('missing-strategist').textContent = recStrat.missing_item || 'Zahlen & KPIs';
+      $('verbatim-strategist').textContent = `"${recStrat.ghost_text}"`;
+      state.agentGhosts['strategist'] = recStrat.ghost_text;
+      cardStrategist.hidden = false;
+    } else {
+      cardStrategist.hidden = true;
+    }
   } else {
     cStrategist.classList.remove('visible');
+    cardStrategist.hidden = true;
     if (sStrategist) sStrategist.textContent = 'bereit';
   }
 
-  // 3. Supervisor: Appears when pitch reaches CTA / structure (>= 120 chars)
-  if (text.length >= 120) {
-    let superChar = text.length;
-    if (sentences.length > 2) {
-      superChar = text.indexOf(sentences[sentences.length - 1]);
-    }
-    const posSupervisor = getWordCoordinates(superChar);
-    cSupervisor.style.transform = `translate(${posSupervisor.left}px, ${posSupervisor.top}px)`;
+  // 3. Supervisor: Anchored to end of text / CTA (>= 90 chars)
+  if (text.length >= 90) {
+    const posSuper = getWordCoordinates(text.length);
+    cSupervisor.style.transform = `translate(${posSuper.left}px, ${posSuper.top}px)`;
     cSupervisor.classList.add('visible');
-    if (sSupervisor) sSupervisor.textContent = 'prüft Struktur';
+    if (sSupervisor) sSupervisor.textContent = 'Struktur & CTA geprüft';
+
+    if (recSuper && !state.dismissed['supervisor'] && recSuper.ghost_text) {
+      $('missing-supervisor').textContent = recSuper.missing_item || 'Call to Action';
+      $('verbatim-supervisor').textContent = `"${recSuper.ghost_text}"`;
+      state.agentGhosts['supervisor'] = recSuper.ghost_text;
+      cardSupervisor.hidden = false;
+    } else {
+      cardSupervisor.hidden = true;
+    }
   } else {
     cSupervisor.classList.remove('visible');
+    cardSupervisor.hidden = true;
     if (sSupervisor) sSupervisor.textContent = 'bereit';
   }
-
-  // Evaluate text for missing items & in-canvas ghost text
-  evaluateLiveAgentHints(text);
-}
-
-function evaluateLiveAgentHints(text) {
-  const bDirector = $('badge-director');
-  const bStrategist = $('badge-strategist');
-  const bSupervisor = $('badge-supervisor');
-
-  const btDirector = $('badgetext-director');
-  const btStrategist = $('badgetext-strategist');
-  const btSupervisor = $('badgetext-supervisor');
-
-  const lower = text.toLowerCase();
-  let primaryGhost = '';
-  let primaryPattern = '';
-
-  // 1. Director (Hook & Greeting check)
-  if (!state.dismissed['director']) {
-    const greetingMatch = text.match(/^(hallo|hi |herzlich willkommen[,\s]*|mein name ist[^\.]*\.)\s*/i);
-    if (greetingMatch) {
-      const clean = text.replace(greetingMatch[0], '').trim();
-      const firstCap = clean ? (clean.charAt(0).toUpperCase() + clean.slice(1)) : 'Wir lösen das Problem für Teams.';
-      btDirector.textContent = 'Nutzenversprechen ohne Begrüßung';
-      bDirector.hidden = false;
-      primaryGhost = firstCap;
-      primaryPattern = `^${greetingMatch[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
-    } else if (text.length > 30 && !lower.includes('?') && !lower.includes('wie') && !lower.includes('warum')) {
-      btDirector.textContent = 'Einstiegsfrage fehlt';
-      bDirector.hidden = false;
-      if (!primaryGhost) primaryGhost = 'Kennst du das Problem, wenn Tests fehlschlagen?';
-    } else {
-      bDirector.hidden = true;
-    }
-  }
-
-  // 2. Strategist (Missing KPI / Metrics check)
-  if (!state.dismissed['strategist'] && text.length >= 60) {
-    if (!/\d+/.test(text)) {
-      btStrategist.textContent = 'Harte Kennzahlen (KPIs) fehlen';
-      bStrategist.hidden = false;
-      if (!primaryGhost) primaryGhost = 'In nur 2 Minuten statt 2 Stunden.';
-    } else {
-      bStrategist.hidden = true;
-    }
-  } else {
-    bStrategist.hidden = true;
-  }
-
-  // 3. Supervisor (Missing CTA check)
-  if (!state.dismissed['supervisor'] && text.length >= 120) {
-    const hasCta = /\b(teste|besuche|link|klick|jetzt|start|beta|download|app|kontakt)\b/i.test(text);
-    if (!hasCta) {
-      btSupervisor.textContent = 'Call to Action (CTA) fehlt';
-      bSupervisor.hidden = false;
-      if (!primaryGhost) primaryGhost = 'Teste die Beta noch heute kostenlos auf palantum.dev.';
-    } else {
-      bSupervisor.hidden = true;
-    }
-  } else {
-    bSupervisor.hidden = true;
-  }
-
-  // Set in-canvas ghost text preview
-  setGhostText(primaryGhost, primaryPattern);
-}
-
-function dismissMissing(agentId) {
-  state.dismissed[agentId] = true;
-  const badge = $(`badge-${agentId}`);
-  if (badge) badge.hidden = true;
-  setGhostText('');
 }
 
 function completeness(text) {
@@ -1088,17 +1094,17 @@ function updateComposer(immediate = false) {
   // React naturally when user pauses typing
   clearTimeout(state.typingTimeout);
   if (immediate) {
-    updateAgentCursors();
+    renderAgentRecommendations();
   } else {
-    state.typingTimeout = setTimeout(updateAgentCursors, 550);
+    state.typingTimeout = setTimeout(renderAgentRecommendations, 450);
   }
 
-  // Background debounced assist query
-  clearTimeout(state.assistDebounce);
-  state.assistDebounce = setTimeout(syncWithBackendOrchestrator, 900);
+  // Query genuine agentic orchestrator on typing pause
+  clearTimeout(state.orchestrateDebounce);
+  state.orchestrateDebounce = setTimeout(triggerAgenticOrchestration, 750);
 }
 
-async function syncWithBackendOrchestrator() {
+async function triggerAgenticOrchestration() {
   const prompt = $('prompt').value.trim();
   if (prompt.length < 15) return;
   try {
@@ -1109,14 +1115,8 @@ async function syncWithBackendOrchestrator() {
     });
     if (res.ok) {
       const data = await res.json();
-      if (data.devin_active) {
-        $('orchestrator-status').textContent = 'Aktiv (Devin)';
-        $('orchestrator-status').style.background = '#dcfce7';
-        $('orchestrator-status').style.borderColor = '#bbf7d0';
-        $('orchestrator-status').style.color = '#166534';
-      } else {
-        $('orchestrator-status').textContent = 'Bereit';
-      }
+      state.activeRecommendations = data.recommendations || [];
+      renderAgentRecommendations();
     }
   } catch (_) {}
 }

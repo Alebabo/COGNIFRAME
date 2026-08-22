@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
@@ -101,6 +102,89 @@ def parse_canvas_beats(text: str) -> dict[str, str]:
     return {b: "\n".join(lines).strip() for b, lines in beats.items()}
 
 
+_AGENTIC_CACHE: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+
+
+def evaluate_canvas_agentic(
+    text: str, brief: str = "", attached_videos: dict[str, str] | None = None
+) -> list[dict[str, Any]]:
+    """Perform real-time multi-agent critique using LLM (OpenAI/Devin) for authentic feedback."""
+    trimmed = text.strip()
+    if not trimmed or len(trimmed) < 15:
+        beats = parse_canvas_beats(trimmed)
+        return evaluate_canvas(beats, attached_videos)
+
+    cache_key = f"{trimmed}|{brief}|{json.dumps(attached_videos or {}, sort_keys=True)}"
+    now = time.time()
+    if cache_key in _AGENTIC_CACHE:
+        timestamp, cached_result = _AGENTIC_CACHE[cache_key]
+        if now - timestamp < 300:  # 5 min cache
+            return cached_result
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        beats = parse_canvas_beats(trimmed)
+        return evaluate_canvas(beats, attached_videos)
+
+    prompt = (
+        "Du bist das kollaborative Agenten-Trio von Palantum für 60s YC-Startup-Video-Pitches:\n"
+        "- A2 (Director): Regie, Hook (1–3s), Schnitte, keine Begrüßungsfloskeln.\n"
+        "- A3 (Strategist): Pitch-Story, harte KPIs/Zahlen, messbarer Nutzen, Zielgruppe.\n"
+        "- A1 (Supervisor): Skript-Länge (~130 Wörter), Wortgrenzen, klarer CTA.\n\n"
+        f"Hier ist der aktuelle Rohentwurf des Nutzers:\n\"\"\"\n{trimmed}\n\"\"\"\n\n"
+        "Aufgabe: Analysiere den Text präzise. Formuliere für bis zu 3 Agenten inhaltsspezifische "
+        "Kritikpunkte (KEINE generischen Ratschläge) und für jeden Agenten einen exakten, "
+        "sprechbaren Verbatim-Ghost-Text zum Einfügen.\n\n"
+        "Antworte ausschließlich als valides JSON-Objekt mit folgender Struktur:\n"
+        "{\n"
+        '  "recommendations": [\n'
+        "    {\n"
+        '      "id": "director-hook",\n'
+        '      "agent": "A2",\n'
+        '      "role": "Director",\n'
+        '      "beat": "HOOK",\n'
+        '      "missing_item": "Konkreter Hook / Visuelle Eröffnung",\n'
+        '      "message": "Präzise, inhaltliche Kritik zum Entwurf...",\n'
+        '      "ghost_text": "Exakter ausformulierter Satz zum Einfügen...",\n'
+        '      "anchor": "hook",\n'
+        '      "anchor_line": 0\n'
+        "    }\n"
+        "  ]\n"
+        "}"
+    )
+
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model=os.getenv("PALANTUM_OPENAI_MODEL", "gpt-4o-mini"),
+            response_format={"type": "json_object"},
+            temperature=0.3,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Du bist der Palantum Video-Pitch Agenten-Orchestrator.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            timeout=12,
+        )
+        content = response.choices[0].message.content or "{}"
+        parsed = json.loads(content)
+        recs = parsed.get("recommendations", [])
+        if isinstance(recs, list) and recs:
+            _AGENTIC_CACHE[cache_key] = (now, recs)
+            return recs
+    except Exception:
+        pass
+
+    beats = parse_canvas_beats(trimmed)
+    fallback = evaluate_canvas(beats, attached_videos)
+    _AGENTIC_CACHE[cache_key] = (now, fallback)
+    return fallback
+
+
 def evaluate_canvas(
     beats: dict[str, str], attached_videos: dict[str, str] | None = None
 ) -> list[dict[str, Any]]:
@@ -121,6 +205,8 @@ def evaluate_canvas(
             "message": "Der Hook fehlt noch. Starte mit einer starken These.",
             "ghost_text": "Zwei Stunden Fehlersuche werden zu zwei Minuten.",
             "target_pattern": "",
+            "anchor": "hook",
+            "anchor_line": 0,
         })
     elif any(g in hook.lower() for g in ["hallo", "hi ", "herzlich willkommen", "mein name ist"]):
         clean_hook = re.sub(
@@ -140,6 +226,8 @@ def evaluate_canvas(
             "message": "Begrüßungen in den ersten 2s kosten Zuschauer. Starte mit dem Nutzen.",
             "ghost_text": first_cap,
             "target_pattern": r"^(hallo|hi|herzlich willkommen[,\s]*|mein name ist[^\.]*\.)\s*",
+            "anchor": "hook",
+            "anchor_line": 0,
         })
 
     # 2. Check PROBLEM
@@ -155,6 +243,8 @@ def evaluate_canvas(
             "message": "Definiere das konkrete Problem: Wer verliert Zeit oder Geld?",
             "ghost_text": "Entwickler verlieren täglich wertvolle Zeit durch manuelle Schritte.",
             "target_pattern": "",
+            "anchor": "problem",
+            "anchor_line": 1,
         })
     elif len(problem.split()) < 4:
         recs.append({
@@ -167,6 +257,8 @@ def evaluate_canvas(
             "message": "Das Problem ist noch abstrakt. Benenne den Schmerzpunkt präziser.",
             "ghost_text": f"{problem} – wodurch Teams jede Woche Stunden verlieren.",
             "target_pattern": problem,
+            "anchor": "problem",
+            "anchor_line": 1,
         })
 
     # 3. Check SOLUTION
@@ -182,6 +274,8 @@ def evaluate_canvas(
             "message": "Erkläre den Mechanismus deiner Lösung (nicht nur Adjektive).",
             "ghost_text": "Unsere Technologie isoliert die Fehlerursache automatisch in Echtzeit.",
             "target_pattern": "",
+            "anchor": "solution",
+            "anchor_line": 2,
         })
 
     # 4. Check DEMO
@@ -197,6 +291,8 @@ def evaluate_canvas(
             "message": "Für DEMO wird visuelles Produktmaterial benötigt (Screen-Recording).",
             "ghost_text": "[Hier Screen-Recording oder UI-Demo anhängen]",
             "target_pattern": "",
+            "anchor": "demo",
+            "anchor_line": 3,
         })
 
     # 5. Check TRACTION
@@ -212,6 +308,8 @@ def evaluate_canvas(
             "message": "Traction ohne Zahlen wirkt schwach. Nenne messbare Nutzerzahlen.",
             "ghost_text": "Über 100 Teams nutzen die Lösung bereits produktiv im Alltag.",
             "target_pattern": "",
+            "anchor": "traction",
+            "anchor_line": 4,
         })
 
     # 6. Check ASK
@@ -227,6 +325,8 @@ def evaluate_canvas(
             "message": "Schließe mit einem klaren Call to Action ab.",
             "ghost_text": "Teste die Beta jetzt kostenlos auf unserer Website.",
             "target_pattern": "",
+            "anchor": "ask",
+            "anchor_line": 5,
         })
 
     return recs

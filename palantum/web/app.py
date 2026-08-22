@@ -20,6 +20,7 @@ from palantum.web.script import (
     create_agent_assist_stream,
     create_script_stream,
     evaluate_canvas,
+    evaluate_canvas_agentic,
     parse_canvas_beats,
 )
 
@@ -325,12 +326,14 @@ def create_app(
                     parsed_beats[k] = v
         if request.beats:
             parsed_beats.update(request.beats)
-
         attached = dict(current.get("attached_videos", {}))
         if request.attached_videos:
             attached.update(request.attached_videos)
 
-        recs = evaluate_canvas(parsed_beats, attached)
+        text = request.text or "\n\n".join(
+            f"[{k}] {v}" for k, v in parsed_beats.items() if v
+        ) or current.get("text", "")
+        recs = evaluate_canvas_agentic(text=text, attached_videos=attached)
 
         # Dynamic agent cursor simulation based on current focus
         active_beats = [b for b, t in parsed_beats.items() if t.strip()]
@@ -364,7 +367,7 @@ def create_app(
 
         updated = {
             "title": request.title or current.get("title", "Mein Startup Pitch"),
-            "text": request.text or current.get("text", ""),
+            "text": text,
             "beats": parsed_beats,
             "beat_info": BEAT_DEFAULTS,
             "attached_videos": attached,
@@ -414,7 +417,7 @@ def create_app(
         text = request.text or request.prompt or current.get("text", "")
         parsed_beats = parse_canvas_beats(text) if text else dict(current.get("beats", {}))
         attached = dict(current.get("attached_videos", {}))
-        recs = evaluate_canvas(parsed_beats, attached)
+        recs = evaluate_canvas_agentic(text=text, attached_videos=attached)
 
         devin_key = os.getenv("DEVIN_API_KEY")
         devin_session_id = None
