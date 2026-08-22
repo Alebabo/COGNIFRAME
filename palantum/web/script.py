@@ -5,7 +5,24 @@ import os
 import re
 import time
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
+
+
+def _ensure_env() -> None:
+    for candidate in [Path(".env"), Path.cwd() / ".env", Path(__file__).parents[2] / ".env"]:
+        if candidate.exists():
+            try:
+                for line in candidate.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, _, v = line.partition("=")
+                    k, v = k.strip(), v.strip()
+                    if k and k not in os.environ:
+                        os.environ[k] = v
+            except Exception:
+                pass
 
 SYSTEM_PROMPT = """Du bist der Script-Editor von Palantum. Schreibe ein prägnantes Videoskript
 für ungefähr 60 Sekunden. Antworte in der Sprache des Briefings. Gliedere den Text in
@@ -121,6 +138,7 @@ def evaluate_canvas_agentic(
         if now - timestamp < 300:  # 5 min cache
             return cached_result
 
+    _ensure_env()
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         beats = parse_canvas_beats(trimmed)
