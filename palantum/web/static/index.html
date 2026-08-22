@@ -141,6 +141,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const MOCK = new URLSearchParams(location.search).get('mock');
+let directing = false;
 
 function show(phase) {
   for (const id of ['empty', 'work', 'done']) {
@@ -184,7 +185,7 @@ function apply(state) {
   renderCoverage(state.coverage.beats);
   renderNotes(state.notes);
   renderCrew(state.sessions);
-  if (state.phase === 'done' && state.video_url) {
+  if (state.phase === 'done' && state.video_url && !directing) {
     $('player').src = state.video_url;
     $('dl-video').href = state.video_url;
     $('dl-project').href = state.export_url;
@@ -208,6 +209,7 @@ async function upload(files) {
   for (const f of files) fd.append('files', f);
   const brief = $('brief').value.trim();
   if (brief) fd.append('brief', brief);
+  directing = false;
   show('work');
   await fetch('/api/upload', { method: 'POST', body: fd });
 }
@@ -223,7 +225,7 @@ for (const zone of [$('drop'), $('drop2')]) {
   });
 }
 $('picker').addEventListener('change', e => { if (e.target.files.length) upload(e.target.files); });
-$('back').addEventListener('click', () => show('work'));
+$('back').addEventListener('click', () => { directing = true; show('work'); });
 
 if (MOCK) {
   fetch(`mock_state_${MOCK}.json`).then(r => r.json()).then(apply);
