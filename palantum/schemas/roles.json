@@ -1,0 +1,201 @@
+{
+  "A1": {
+    "type": "object",
+    "required": ["takes", "beat_candidates"],
+    "additionalProperties": false,
+    "properties": {
+      "takes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["id", "duration_s", "visual_kind", "has_ui", "framing", "background", "same_speaker", "slips"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "duration_s": { "type": "number" },
+            "visual_kind": {
+              "type": "string",
+              "enum": ["talking_head", "screen_recording", "b_roll", "slate", "unknown"]
+            },
+            "has_ui": { "type": "boolean" },
+            "framing": { "type": "string", "enum": ["close", "medium", "wide", "unknown"] },
+            "background": { "type": "string" },
+            "same_speaker": { "type": "boolean" },
+            "slips": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["start", "end", "quote", "kind"],
+                "additionalProperties": false,
+                "properties": {
+                  "start": { "type": "number" },
+                  "end": { "type": "number" },
+                  "quote": { "type": "string" },
+                  "kind": { "type": "string", "enum": ["false_start", "misspeak", "self_correction", "filler_cluster"] }
+                }
+              }
+            }
+          }
+        }
+      },
+      "beat_candidates": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["beat", "candidates"],
+          "additionalProperties": false,
+          "properties": {
+            "beat": { "type": "string" },
+            "candidates": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["source", "start", "end", "quote"],
+                "additionalProperties": false,
+                "properties": {
+                  "source": { "type": "string" },
+                  "start": { "type": "number" },
+                  "end": { "type": "number" },
+                  "quote": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "A2": {
+    "type": "object",
+    "required": ["beats", "beat_order", "order_reason", "director_notes"],
+    "additionalProperties": false,
+    "properties": {
+      "beats": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["id", "status", "source", "range", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "status": { "type": "string", "enum": ["missing", "weak", "covered"] },
+            "source": { "type": ["string", "null"] },
+            "range": { "type": ["array", "null"], "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+            "reason": { "type": "string" }
+          }
+        }
+      },
+      "beat_order": { "type": "array", "items": { "type": "string" } },
+      "order_reason": { "type": "string" },
+      "director_notes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["beat", "status", "why", "shot", "impact", "slot_in_timeline"],
+          "additionalProperties": false,
+          "properties": {
+            "beat": { "type": "string" },
+            "status": { "type": "string", "enum": ["missing", "weak"] },
+            "why": { "type": "string" },
+            "shot": {
+              "type": "object",
+              "required": ["line", "framing", "duration_s", "delivery"],
+              "additionalProperties": false,
+              "properties": {
+                "line": { "type": "string" },
+                "framing": { "type": "string" },
+                "duration_s": { "type": "number" },
+                "delivery": { "type": "string" }
+              }
+            },
+            "impact": { "type": "string", "enum": ["high", "medium", "low"] },
+            "slot_in_timeline": { "type": "number" }
+          }
+        }
+      }
+    }
+  },
+  "A3": {
+    "type": "object",
+    "required": ["rulings", "content_findings"],
+    "additionalProperties": false,
+    "properties": {
+      "rulings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["beat", "verdict", "quote", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "beat": { "type": "string" },
+            "verdict": { "type": "string", "enum": ["agree", "weak", "covered"] },
+            "quote": { "type": "string" },
+            "reason": { "type": "string" }
+          }
+        }
+      },
+      "content_findings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["quote", "problem", "fix"],
+          "additionalProperties": false,
+          "properties": {
+            "quote": { "type": "string" },
+            "problem": { "type": "string" },
+            "fix": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "A4": {
+    "type": "object",
+    "required": ["ranges", "total_duration_s", "notes"],
+    "additionalProperties": false,
+    "properties": {
+      "ranges": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["source", "start", "end", "beat", "quote", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "source": { "type": "string" },
+            "start": { "type": "number" },
+            "end": { "type": "number" },
+            "beat": { "type": "string" },
+            "quote": { "type": "string" },
+            "reason": { "type": "string" }
+          }
+        }
+      },
+      "total_duration_s": { "type": "number" },
+      "notes": { "type": "string" }
+    }
+  },
+  "A7": {
+    "type": "object",
+    "required": ["findings", "verdict"],
+    "additionalProperties": false,
+    "properties": {
+      "findings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["check", "verdict", "measured", "expected", "where", "fix"],
+          "additionalProperties": false,
+          "properties": {
+            "check": { "type": "string" },
+            "verdict": { "type": "string", "enum": ["pass", "fail", "unmeasurable"] },
+            "measured": { "type": "string" },
+            "expected": { "type": "string" },
+            "where": { "type": "string" },
+            "fix": { "type": "string" }
+          }
+        }
+      },
+      "verdict": { "type": "string", "enum": ["pass", "fail"] }
+    }
+  }
+}
