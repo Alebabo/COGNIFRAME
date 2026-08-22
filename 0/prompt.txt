@@ -1,0 +1,1 @@
+bitte checkpoints erstellen, entire skills runterladen (npx skills add [https://github.com/entireio/skills](https://github.com/entireio/skills) --all), skills benutzten und zu git pushen
