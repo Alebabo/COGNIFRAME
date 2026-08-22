@@ -1,0 +1,97 @@
+{
+  "cli_version": "0.10.2",
+  "checkpoint_id": "01M0NQR8N8579KW6XX6SZTKZMA",
+  "session_id": "01a02b78-83ff-7cc1-be01-253d6a0e2db3",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-22T21:59:15.9148329Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "palantum/cli.py",
+    "palantum/motion/harness.py",
+    "palantum/web/app.py",
+    "palantum/web/static/index.html",
+    "tests/test_motion.py",
+    "tests/test_web.py"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.6-sol",
+  "turn_id": "40f90e17c32d",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 74729,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 645841,
+    "output_tokens": 3660,
+    "api_call_count": 21
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-22T21:59:15.8634445Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 658,
+    "human_removed": 389,
+    "total_committed": 0,
+    "total_lines_changed": 1048,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 834,
+      "user_lines_removed": 675,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "palantum/cli.py": 100,
+        "palantum/motion/harness.py": 7,
+        "palantum/web/app.py": 217,
+        "palantum/web/script.py": 62,
+        "palantum/web/static/index.html": 134,
+        "scripts/make_fixtures.py": 192,
+        "scripts/setup_engine.sh": 3,
+        "tests/test_motion.py": 5,
+        "tests/test_script.py": 16,
+        "tests/test_web.py": 98
+      },
+      "user_removed_per_file": {
+        "palantum/cli.py": 97,
+        "palantum/motion/harness.py": 1,
+        "palantum/web/app.py": 142,
+        "palantum/web/static/index.html": 217,
+        "scripts/make_fixtures.py": 192,
+        "scripts/setup_engine.sh": 3,
+        "tests/test_web.py": 23
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 834,
+      "agent_lines_removed": 675
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 367,
+      "user_lines_removed": 276,
+      "agent_lines_added": 834,
+      "agent_lines_removed": 675,
+      "user_added_per_file": {
+        "palantum/engine/render_bridge.py": 43,
+        "palantum/engine/videouse.py": 281,
+        "tests/test_render_bridge.py": 23,
+        "tests/test_videouse_doctor.py": 20
+      },
+      "user_removed_per_file": {
+        "palantum/engine/videouse.py": 276
+      }
+    }
+  ]
+}
