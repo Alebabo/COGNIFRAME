@@ -6,7 +6,14 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import TypedDict, cast
+
+from openai import OpenAI
+from openai.types.chat import (
+    ChatCompletionContentPartImageParam,
+    ChatCompletionContentPartTextParam,
+    ChatCompletionUserMessageParam,
+)
 
 from palantum.engine.videouse import probe
 
@@ -54,31 +61,29 @@ def _frame(source: Path, timestamp: float, output: Path) -> None:
 
 
 def _classify(frames: list[Path]) -> VisualBlock:
-    from openai import OpenAI
-
-    content: list[dict[str, object]] = [
-        {
-            "type": "text",
-            "text": (
+    content: list[ChatCompletionContentPartTextParam | ChatCompletionContentPartImageParam] = [
+        ChatCompletionContentPartTextParam(
+            type="text",
+            text=(
                 "Classify the video frames as one of talking_head, screen_recording, "
                 "b_roll, slate, or unknown. Return has_ui=true only when a product "
                 "interface is visibly present. Give one concise sentence describing "
                 "the frames."
             ),
-        }
+        )
     ]
     for frame in frames:
         encoded = base64.b64encode(frame.read_bytes()).decode("ascii")
         content.append(
-            {
-                "type": "image_url",
-                "image_url": {"url": f"data:image/png;base64,{encoded}"},
-            }
+            ChatCompletionContentPartImageParam(
+                type="image_url",
+                image_url={"url": f"data:image/png;base64,{encoded}"},
+            )
         )
-    client: Any = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
     response = client.chat.completions.create(
         model=os.getenv("PALANTUM_VISION_MODEL", "gpt-4o-mini"),
-        messages=[{"role": "user", "content": content}],
+        messages=[ChatCompletionUserMessageParam(role="user", content=content)],
         temperature=0,
         response_format={
             "type": "json_schema",

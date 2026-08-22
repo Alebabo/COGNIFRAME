@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -62,6 +63,98 @@ def _probe_context(result: ProbeResult) -> dict[str, Any]:
         "has_audio": result.has_audio,
         "streams": result.streams,
     }
+
+
+def _volume_value(stderr: str, label: str) -> float:
+    match = re.search(rf"{label}:\s*(-?(?:\d+(?:\.\d+)?|inf))\s+dB", stderr)
+    if not match:
+        raise ValueError(f"ffmpeg volumedetect did not report {label}")
+    value = match.group(1)
+    return -100.0 if value in {"-inf", "inf"} else float(value)
+
+
+def _audio_check(output: Path, ranges: list[dict[str, Any]]) -> dict[str, Any]:
+    """Measure segment loudness; both mean and peak below -45 dBFS mean silence.
+
+    The threshold leaves substantial headroom below normal speech while requiring
+    both measures to be quiet, avoiding false positives for sparse speech with a
+    low average level but audible peaks.
+    """
+    threshold = -45.0
+    segments: list[dict[str, Any]] = []
+    silent_segments: list[int] = []
+    offset = 0.0
+    for index, item in enumerate(ranges):
+        duration = float(item["end"]) - float(item["start"])
+        try:
+            raw = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-nostats",
+                    "-i",
+                    str(output),
+                    "-ss",
+                    f"{offset:.3f}",
+                    "-t",
+                    f"{duration:.3f}",
+                    "-af",
+                    "volumedetect",
+                    "-f",
+                    "null",
+                    "-",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            mean_dbfs = _volume_value(raw.stderr, "mean_volume")
+            max_dbfs = _volume_value(raw.stderr, "max_volume")
+        except (subprocess.CalledProcessError, ValueError):
+            mean_dbfs = -100.0
+            max_dbfs = -100.0
+        silent = mean_dbfs <= threshold and max_dbfs <= threshold
+        segments.append(
+            {
+                "index": index,
+                "start_s": offset,
+                "end_s": offset + duration,
+                "mean_dbfs": mean_dbfs,
+                "max_dbfs": max_dbfs,
+                "silent": silent,
+            }
+        )
+        if silent:
+            silent_segments.append(index)
+        offset += duration
+    return {
+        "segments": segments,
+        "silent_segments": silent_segments,
+        "threshold_dbfs": threshold,
+    }
+
+
+def _duration_check(expected_total: float, measured: float) -> dict[str, Any]:
+    delta = abs(measured - expected_total)
+    return {
+        "expected_total_s": expected_total,
+        "measured_s": measured,
+        "delta_s": delta,
+        "tolerance_s": 0.30,
+        "within_tolerance": delta <= 0.30,
+    }
+
+
+def _normalize_qc_verdict(report: dict[str, Any]) -> dict[str, Any]:
+    """Make the aggregate verdict follow the structured per-check verdicts."""
+    findings = report.get("findings", [])
+    if isinstance(findings, list):
+        report["verdict"] = (
+            "fail"
+            if any(isinstance(item, dict) and item.get("verdict") == "fail" for item in findings)
+            else "pass"
+        )
+    return report
 
 
 def _apply_coverage(
@@ -245,18 +338,13 @@ def cut(edit_dir: Path, sources: list[Path]) -> tuple[dict[str, Any], dict[str, 
         offset += duration
     qc_context = {
         "probe": _probe_context(result),
-        "duration_check": {
-            "expected_total_s": expected_total,
-            "measured_s": measured,
-            "delta_s": abs(measured - expected_total),
-            "tolerance_s": 0.30,
-            "within_tolerance": abs(measured - expected_total) <= 0.30,
-        },
+        "duration_check": _duration_check(expected_total, measured),
+        "audio_check": _audio_check(output, edl["ranges"]),
         "edl": edl,
         "timeline_views": views,
         "subtitle_file": str(edit_dir / "master.srt"),
     }
-    a7 = run_role("A7", _prompt("A7"), qc_context, None)
+    a7 = _normalize_qc_verdict(run_role("A7", _prompt("A7"), qc_context, None))
     if a7.get("verdict") == "fail":
         retry_context = dict(context)
         retry_context["qc_findings"] = a7
@@ -269,13 +357,8 @@ def cut(edit_dir: Path, sources: list[Path]) -> tuple[dict[str, Any], dict[str, 
         qc_context["edl"] = edl
         measured = result.duration_s
         expected_total = sum(float(item["end"]) - float(item["start"]) for item in edl["ranges"])
-        qc_context["duration_check"] = {
-            "expected_total_s": expected_total,
-            "measured_s": measured,
-            "delta_s": abs(measured - expected_total),
-            "tolerance_s": 0.30,
-            "within_tolerance": abs(measured - expected_total) <= 0.30,
-        }
-        a7 = run_role("A7", _prompt("A7"), qc_context, None)
+        qc_context["duration_check"] = _duration_check(expected_total, measured)
+        qc_context["audio_check"] = _audio_check(output, edl["ranges"])
+        a7 = _normalize_qc_verdict(run_role("A7", _prompt("A7"), qc_context, None))
     (edit_dir / "qc.json").write_text(json.dumps(a7, indent=2, ensure_ascii=False))
     return edl, a7

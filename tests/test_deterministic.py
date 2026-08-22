@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from palantum.engine.transcribe import whisper_to_scribe
-from palantum.orchestrator import _apply_coverage, _debate, gate
+from palantum.orchestrator import _apply_coverage, _audio_check, _debate, gate
 from palantum.state import coverage_score, empty_state
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +35,33 @@ def test_whisper_adapter_inserts_spacing_and_constant_speaker() -> None:
     assert result["words"][1]["start"] == 0.4
     assert result["words"][1]["end"] == 1.0
     assert {item["speaker_id"] for item in result["words"]} == {"speaker_0"}
+
+
+def test_audio_check_reports_loud_and_silent_segments(tmp_path: Path, monkeypatch: object) -> None:
+    class Completed:
+        stderr = "mean_volume: -14.0 dB\nmax_volume: -1.0 dB\n"
+
+    calls = 0
+
+    def run(*args: object, **kwargs: object) -> Completed:
+        nonlocal calls
+        calls += 1
+        result = Completed()
+        if calls == 2:
+            result.stderr = "mean_volume: -100.0 dB\nmax_volume: -100.0 dB\n"
+        return result
+
+    monkeypatch.setattr("palantum.orchestrator.subprocess.run", run)
+    result = _audio_check(
+        tmp_path / "final.mp4",
+        [
+            {"start": 0.0, "end": 1.0},
+            {"start": 1.0, "end": 2.0},
+        ],
+    )
+    assert result["silent_segments"] == [1]
+    assert result["segments"][0]["start_s"] == 0.0
+    assert result["segments"][1]["end_s"] == 2.0
 
 
 def test_strategist_wins_weak_vs_covered_and_logs_debate() -> None:
