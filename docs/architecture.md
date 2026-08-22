@@ -17,14 +17,15 @@ palantum/
   agents/
     runner.py          # backend-agnostic role invocation
     backends/          # devin.py (Devin API sessions), openai.py (fast local)
-    prompts/*.md       # role prompts (A1, A2, A3, A4, A7)
+    prompts/*.md       # role prompts (A0-A4, A6/A6.x, A7)
+  motion/              # external-pack catalog + isolated Remotion slot harnesses
   engine/
     videouse.py        # wrapper around vendored video-use helpers
     transcribe.py      # Whisper word-level ASR in Scribe JSON shape
   export/
     package.py         # §7 export package: stems + FCPXML + OTIO + CMX3600
   web/                 # FastAPI + single white page (states 3 -> 2 -> 1)
-vendor/video-use/      # cloned by scripts/setup_engine.sh, pinned, not committed
+vendor/video-use/      # cloned by scripts/setup_engine.py, pinned, not committed
 ```
 
 Session outputs live in `<videos_dir>/edit/` only — never inside the repo, never inside
@@ -33,12 +34,13 @@ Session outputs live in `<videos_dir>/edit/` only — never inside the repo, nev
 ## The loop
 
 ```
-ingest(file) -> transcribe (cached) -> pack -> A1 -> A2 <-> A3 (max 2 rounds) -> coverage.json
+ingest(file) -> transcribe (cached) -> pack -> A1 -> A2 <-> A3 -> coverage.json
+                                  \-> A0 template scout (parallel) -> scene-catalog.json
                                                         |
                              all required beats >= weak? no -> stop, print Director Notes
                                                         yes
                                                          v
-                                            A4 -> edl.json -> render.py -> A7
+                         A4 -> A6 -> parallel A6.x slots -> edl.json -> render.py -> A7
                                                          |
                                               fail -> one re-iteration
                                                          v
@@ -54,18 +56,19 @@ Conflict rules, enforced by the orchestrator and not negotiable by any agent:
 | Take selection inside a beat | A4 Cutter |
 | Delivery | A7 QC has veto, no content vote |
 
-A2/A3 debate is capped at two rounds; afterwards the rule above applies mechanically and the
-outcome is appended to `debate_log` in `coverage.json`.
+A2/A3 results are resolved mechanically with the rule above and the outcome is appended to
+`debate_log` in `coverage.json`.
 
 ## Agent backends
 
 Every role is one session with a JSON schema from `schemas/roles.json`; the orchestrator never
 parses prose. Two interchangeable backends:
 
-- `devin` — one Devin session per role with `structured_output_schema`, `tags` (`run-<n>`, role),
-  and `max_acu_limit`. This is the pitch configuration; session URLs are surfaced in the UI.
+- `devin` — the production default. It creates one Devin session per role (and one per A6.x motion
+  slot) with `structured_output_schema`, `tags` (`run-<n>`, role), and `max_acu_limit`. Session URLs
+  are written atomically to `sessions.json` and surfaced in the UI.
 - `openai` — one structured-output call per role. Same prompts, same schemas, seconds instead of
-  minutes. Default for development and CI.
+  minutes. It is available only when explicitly selected with `PALANTUM_AGENT_BACKEND=openai`.
 
 ## Web API contract
 

@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from palantum.orchestrator import (
+    _graphics_overlays,
+    _selectable_scenes,
+    _validate_overlay_plan,
+)
+
+
+def _scene(scene_id: str, beat: str) -> dict[str, object]:
+    return {
+        "id": scene_id,
+        "type": beat,
+        "status": "ok",
+        "confidence": 0.9,
+        "duration_s": 3.0,
+        "slots": [{"key": "title", "max_chars": 20, "default": "Default"}],
+    }
+
+
+def test_overlay_plan_enforces_catalog_slots_timing_and_non_overlap() -> None:
+    scenes = [_scene("hero-stat-callout", "PROBLEM")]
+    timeline = [
+        {
+            "beat": "PROBLEM",
+            "start_in_output": 2.0,
+            "end_in_output": 6.0,
+            "duration": 4.0,
+            "quote": "Pain",
+        }
+    ]
+    overlay = {
+        "slot_id": "problem-01",
+        "template_id": "hero-stat-callout",
+        "beat": "PROBLEM",
+        "start_in_output": 2.5,
+        "duration": 2.0,
+        "props": {"title": "Pain costs millions"},
+        "reason": "Quantifies the pain",
+    }
+
+    assert _validate_overlay_plan([overlay], scenes, timeline)[0]["scene"] == scenes[0]
+
+    invalid = dict(overlay, props={"title": "x" * 21})
+    with pytest.raises(ValueError, match="max_chars"):
+        _validate_overlay_plan([invalid], scenes, timeline)
+
+    overlapping = dict(overlay, slot_id="problem-02", start_in_output=4.0)
+    with pytest.raises(ValueError, match="overlap"):
+        _validate_overlay_plan([overlay, overlapping], scenes, timeline)
+
+
+def test_graphics_director_runs_parallel_slot_workers_and_returns_edl_entries(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "templates.zip"
+    source.write_bytes(b"fixture")
+    scene = _scene("hero-stat-callout", "PROBLEM")
+    catalog = {"source": {"sha256": "abc"}, "scenes": [scene]}
+    ranges = [
+        {
+            "source": "take",
+            "start": 1.0,
+            "end": 5.0,
+            "beat": "PROBLEM",
+            "quote": "Pain",
+            "reason": "best take",
+        }
+    ]
+    plan = {
+        "overlays": [
+            {
+                "slot_id": "problem-01",
+                "template_id": "hero-stat-callout",
+                "beat": "PROBLEM",
+                "start_in_output": 0.5,
+                "duration": 2.0,
+                "props": {"title": "Pain"},
+                "reason": "show pain",
+            }
+        ]
+    }
+
+    def run(role: str, *_args: object, **_kwargs: object) -> dict[str, object]:
+        if role == "A6":
+            return plan
+        return {
+            "slot_id": "problem-01",
+            "template_id": "hero-stat-callout",
+            "props": {"title": "Pain"},
+            "checks": ["identity", "limits", "brand", "timing"],
+        }
+
+    rendered = {
+        "file": "animations/slot_problem-01/render.mov",
+        "start_in_output": 0.5,
+        "duration": 2.0,
+        "slot_id": "problem-01",
+        "template_id": "hero-stat-callout",
+        "beat": "PROBLEM",
+    }
+    with (
+        patch("palantum.orchestrator.build_scene_catalog", return_value=catalog),
+        patch("palantum.orchestrator.run_role", side_effect=run) as roles,
+        patch("palantum.orchestrator._render_motion_job", return_value=rendered) as render,
+    ):
+        result = _graphics_overlays(
+            tmp_path / "edit", {"brand": {}}, ranges, source, (1920, 1080)
+        )
+
+    assert result == [rendered]
+    assert [call.args[0] for call in roles.call_args_list] == ["A6", "A6W"]
+    render.assert_called_once()
+
+
+def test_only_a0_approved_scenes_are_selectable() -> None:
+    approved = _scene("hero-stat-callout", "PROBLEM")
+    low_confidence = _scene("brand-statement", "ASK") | {"confidence": 0.6}
+    broken = _scene("flowchart", "SOLUTION") | {"status": "broken"}
+
+    assert _selectable_scenes({"scenes": [approved, low_confidence, broken]}) == [approved]

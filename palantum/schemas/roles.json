@@ -1,4 +1,29 @@
 {
+  "A0": {
+    "type": "object",
+    "required": ["scenes"],
+    "additionalProperties": false,
+    "properties": {
+      "scenes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["id", "type", "confidence", "status", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": {
+              "type": "string",
+              "enum": ["PROBLEM", "SOLUTION", "DEMO", "TRACTION", "ASK", "unclassified"]
+            },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "status": { "type": "string", "enum": ["ok", "broken"] },
+            "reason": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
   "A1": {
     "type": "object",
     "required": ["takes", "beat_candidates"],
@@ -172,6 +197,50 @@
       },
       "total_duration_s": { "type": "number" },
       "notes": { "type": "string" }
+    }
+  },
+  "A6": {
+    "type": "object",
+    "required": ["overlays"],
+    "additionalProperties": false,
+    "properties": {
+      "overlays": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["slot_id", "template_id", "beat", "start_in_output", "duration", "props", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "slot_id": { "type": "string" },
+            "template_id": { "type": "string" },
+            "beat": { "type": "string", "enum": ["PROBLEM", "SOLUTION", "DEMO", "TRACTION", "ASK"] },
+            "start_in_output": { "type": "number", "minimum": 0 },
+            "duration": { "type": "number", "exclusiveMinimum": 0 },
+            "props": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "reason": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "A6W": {
+    "type": "object",
+    "required": ["slot_id", "template_id", "props", "checks"],
+    "additionalProperties": false,
+    "properties": {
+      "slot_id": { "type": "string" },
+      "template_id": { "type": "string" },
+      "props": {
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      },
+      "checks": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
     }
   },
   "A7": {

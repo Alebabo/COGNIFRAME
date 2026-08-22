@@ -125,7 +125,43 @@ def _copy_media(edit_dir: Path, package_dir: Path, edl: dict[str, Any]) -> list[
     return exported
 
 
-def _write_fcpxml(package_dir: Path, clips: list[dict[str, Any]], srt: Path, fps: float) -> None:
+def _resolve_overlay(edit_dir: Path, value: str) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    for candidate in (edit_dir / path, edit_dir.parent / path):
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(f"overlay does not exist: {value}")
+
+
+def _copy_graphics(
+    edit_dir: Path, package_dir: Path, edl: dict[str, Any]
+) -> list[dict[str, Any]]:
+    graphics: list[dict[str, Any]] = []
+    for index, item in enumerate(edl.get("overlays", [])):
+        source = _resolve_overlay(edit_dir, str(item["file"]))
+        destination = package_dir / "media" / "graphics" / f"graphic_{index:02d}_{source.name}"
+        _hardlink_or_copy(source, destination)
+        graphics.append(
+            {
+                "index": index,
+                "name": str(item.get("template_id", item.get("beat", source.stem))),
+                "start": float(item["start_in_output"]),
+                "duration": float(item["duration"]),
+                "clip": destination.relative_to(package_dir).as_posix(),
+            }
+        )
+    return graphics
+
+
+def _write_fcpxml(
+    package_dir: Path,
+    clips: list[dict[str, Any]],
+    graphics: list[dict[str, Any]],
+    srt: Path,
+    fps: float,
+) -> None:
     root = ET.Element("fcpxml", {"version": "1.10"})
     resources = ET.SubElement(root, "resources")
     rate = _fps_fraction(fps)
@@ -166,6 +202,21 @@ def _write_fcpxml(package_dir: Path, clips: list[dict[str, Any]], srt: Path, fps
                 "duration": _time(clip["end"] - clip["start"], fps),
                 "hasVideo": "0",
                 "hasAudio": "1",
+            },
+        )
+    for graphic in graphics:
+        ET.SubElement(
+            resources,
+            "asset",
+            {
+                "id": f"graphic-{graphic['index']}",
+                "name": Path(str(graphic["clip"])).name,
+                "src": f"file://{package_dir / graphic['clip']}",
+                "start": _time(0, fps),
+                "duration": _time(float(graphic["duration"]), fps),
+                "hasVideo": "1",
+                "hasAudio": "0",
+                "format": "r1",
             },
         )
     title_effect = ET.SubElement(
@@ -219,6 +270,19 @@ def _write_fcpxml(package_dir: Path, clips: list[dict[str, Any]], srt: Path, fps
             },
         )
         offset += duration
+    for graphic in graphics:
+        ET.SubElement(
+            spine,
+            "asset-clip",
+            {
+                "name": str(graphic["name"]),
+                "ref": f"graphic-{graphic['index']}",
+                "offset": _time(float(graphic["start"]), fps),
+                "start": _time(0, fps),
+                "duration": _time(float(graphic["duration"]), fps),
+                "lane": str(SPURS["graphics"][1]),
+            },
+        )
     if srt.exists():
         for _index, (start, end, text) in enumerate(_parse_srt(srt)):
             ET.SubElement(
@@ -256,7 +320,13 @@ def _parse_timestamp(value: str) -> float:
     return int(hours) * 3600 + int(minutes) * 60 + seconds
 
 
-def _write_otio(package_dir: Path, clips: list[dict[str, Any]], srt: Path, fps: float) -> None:
+def _write_otio(
+    package_dir: Path,
+    clips: list[dict[str, Any]],
+    graphics: list[dict[str, Any]],
+    srt: Path,
+    fps: float,
+) -> None:
     tracks: dict[str, list[dict[str, Any]]] = {
         name: []
         for name in (
@@ -316,6 +386,32 @@ def _write_otio(package_dir: Path, clips: list[dict[str, Any]], srt: Path, fps: 
             }
         )
         offset += duration
+    for graphic in graphics:
+        duration = _frames(float(graphic["duration"]), fps)
+        tracks["V3 graphics"].append(
+            {
+                "OTIO_SCHEMA": "Clip.2",
+                "name": graphic["name"],
+                "media_reference": {
+                    "OTIO_SCHEMA": "ExternalReference.1",
+                    "target_url": graphic["clip"],
+                },
+                "source_range": {
+                    "OTIO_SCHEMA": "TimeRange.1",
+                    "start_time": {
+                        "OTIO_SCHEMA": "RationalTime.1",
+                        "value": 0,
+                        "rate": fps,
+                    },
+                    "duration": {
+                        "OTIO_SCHEMA": "RationalTime.1",
+                        "value": duration,
+                        "rate": fps,
+                    },
+                },
+                "timeline_start": _frames(float(graphic["start"]), fps),
+            }
+        )
     payload = {
         "OTIO_SCHEMA": "Timeline.1",
         "name": package_dir.name,
@@ -386,14 +482,15 @@ def export_project(edit_dir: Path, output_parent: Path | None = None) -> Path:
     for directory in ("aroll", "broll", "graphics", "audio"):
         (package_dir / "media" / directory).mkdir(parents=True, exist_ok=True)
     clips = _copy_media(edit_dir, package_dir, edl)
+    graphics = _copy_graphics(edit_dir, package_dir, edl)
     srt = edit_dir / "master.srt"
     if srt.exists():
         shutil.copy2(srt, package_dir / "subtitles.srt")
     else:
         (package_dir / "subtitles.srt").write_text("")
     shutil.copy2(edit_dir / "coverage.json", package_dir / "coverage.json")
-    _write_fcpxml(package_dir, clips, srt, fps)
-    _write_otio(package_dir, clips, srt, fps)
+    _write_fcpxml(package_dir, clips, graphics, srt, fps)
+    _write_otio(package_dir, clips, graphics, srt, fps)
     _write_edl(package_dir, clips, fps)
     (package_dir / "README.txt").write_text(
         "Dieses Paket ist der auftrennbare Palantum-Schnitt für "

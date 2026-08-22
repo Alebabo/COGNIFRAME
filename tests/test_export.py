@@ -21,6 +21,9 @@ def test_export_writes_fps_aware_zero_based_timelines(tmp_path: Path, monkeypatc
     )
     (edit / "coverage.json").write_text("{}")
     (edit / "final.mp4").write_bytes(b"render")
+    animation = edit / "animations" / "slot_traction" / "render.mov"
+    animation.parent.mkdir(parents=True)
+    animation.write_bytes(b"prores-4444")
     (edit / "master.srt").write_text("1\n00:00:00,000 --> 00:00:00,500\nHELLO\n")
     (edit / "edl.json").write_text(
         json.dumps(
@@ -29,6 +32,14 @@ def test_export_writes_fps_aware_zero_based_timelines(tmp_path: Path, monkeypatc
                 "ranges": [
                     {"source": "take_a", "start": 3, "end": 5, "beat": "HOOK", "quote": "a"},
                     {"source": "take_b", "start": 8, "end": 11, "beat": "DEMO", "quote": "b"},
+                ],
+                "overlays": [
+                    {
+                        "file": str(animation),
+                        "template_id": "saas-metrics-board",
+                        "start_in_output": 1,
+                        "duration": 2,
+                    }
                 ],
             }
         )
@@ -62,13 +73,17 @@ def test_export_writes_fps_aware_zero_based_timelines(tmp_path: Path, monkeypatc
     assert (output / "media/broll").joinpath("broll_01_seg_01_take_b.mp4").exists()
     assert (output / "media/audio/voice_00_seg_00_take_a.wav").exists()
     assert (output / "media/audio/voice_01_seg_01_take_b.wav").exists()
+    assert (output / "media/graphics/graphic_00_render.mov").exists()
     otio = json.loads((output / "timeline.otio").read_text())
     assert otio["metadata"]["duration_frames"] == 125
     assert otio["metadata"]["fps"] == 25.0
     tracks = otio["tracks"]["children"]
     voice = next(track for track in tracks if track["name"] == "A1 voice")
+    graphics = next(track for track in tracks if track["name"] == "V3 graphics")
     assert voice["children"][0]["source_range"]["start_time"]["value"] == 0
     assert voice["children"][1]["timeline_start"] == 50
+    assert graphics["children"][0]["timeline_start"] == 25
+    assert root.find(".//asset-clip[@ref='graphic-0']") is not None
     edl_lines = (output / "timeline.edl").read_text().splitlines()
     events = [line for line in edl_lines if line[:3].isdigit()]
     assert all(line.split()[4] == "00:00:00:00" for line in events)

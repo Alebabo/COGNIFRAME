@@ -107,11 +107,10 @@ def state_payload(videos_dir: Path) -> dict[str, Any]:
 
 
 def _process_upload(videos_dir: Path, sources: list[Path], brief: str | None) -> None:
-    del brief
     with _LOCK:
         edit_dir = videos_dir / "edit"
         for source in sources:
-            analyze(edit_dir, [source])
+            analyze(edit_dir, [source], brief=brief)
         state = load(edit_dir, _schema())
         allowed, _ = gate(state, _schema())
         if allowed:
