@@ -113,7 +113,12 @@ def probe(path: Path) -> ProbeResult:
 
 
 def run_helper(name: str, args: list[str]) -> HelperResult:
-    command = [sys.executable, str(_helper(name)), *args]
+    helper = _helper(name)
+    if name == "render.py":
+        bridge = Path(__file__).with_name("render_bridge.py")
+        command = [sys.executable, str(bridge), str(helper), *args]
+    else:
+        command = [sys.executable, str(helper), *args]
     environment = os.environ.copy()
     environment.setdefault("PYTHONUTF8", "1")
     raw = subprocess.run(

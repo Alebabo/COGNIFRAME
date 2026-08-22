@@ -32,6 +32,26 @@ def test_run_helper_uses_active_python(monkeypatch: Any, tmp_path: Path) -> None
     assert options["env"]["PYTHONUTF8"] == "1"  # type: ignore[index]
 
 
+def test_render_helper_uses_windows_compatibility_bridge(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    helper = tmp_path / "render.py"
+    helper.write_text("")
+    seen: list[str] = []
+
+    def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        seen.extend(command)
+        return subprocess.CompletedProcess(command, 0, stdout="done", stderr="")
+
+    monkeypatch.setattr(videouse, "_helper", lambda _name: helper)
+    monkeypatch.setattr(subprocess, "run", run)
+
+    videouse.run_helper("render.py", ["edl.json"])
+
+    assert Path(seen[1]).name == "render_bridge.py"
+    assert seen[2:] == [str(helper), "edl.json"]
+
+
 def test_doctor_validates_pin_and_motion_prerequisites(monkeypatch: Any, tmp_path: Path) -> None:
     checkout = tmp_path / "vendor" / "video-use"
     (checkout / ".git").mkdir(parents=True)

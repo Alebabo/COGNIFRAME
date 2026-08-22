@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import zipfile
 from pathlib import Path
 
@@ -110,6 +111,10 @@ def test_materialize_creates_isolated_harness_and_validates_props(tmp_path: Path
     assert json.loads((slot / "props.json").read_text()) == {"title": "Traction"}
     assert json.loads((slot / "palantum-slot.json").read_text())["source_sha256"]
     command = build_render_command(slot)
+    if os.name == "nt":
+        assert command[1:5] == ["/d", "/s", "/c", "npx"]
+    else:
+        assert command[0] == "npx"
     assert "--prores-profile=4444" in command
     assert "--pixel-format=yuva444p10le" in command
     assert "--image-format=png" in command

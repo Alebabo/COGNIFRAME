@@ -57,6 +57,7 @@ def main() -> None:
     serve = commands.add_parser("serve")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", default=8000, type=int)
+    serve.add_argument("--template-source", type=Path)
     args = parser.parse_args()
     videos_dir = args.videos_dir.resolve()
     edit_dir = videos_dir / "edit"
@@ -95,7 +96,9 @@ def main() -> None:
 
         from palantum.web import create_app
 
-        uvicorn.run(create_app(videos_dir), host=args.host, port=args.port)
+        uvicorn.run(
+            create_app(videos_dir, args.template_source), host=args.host, port=args.port
+        )
         return
     sources = sorted(videos_dir.glob("*.mp4")) + sorted(videos_dir.glob("*.mov"))
     state = load(edit_dir, schema)

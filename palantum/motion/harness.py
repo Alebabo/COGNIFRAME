@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -185,8 +186,13 @@ export const RemotionRoot: React.FC = () => (
 def build_render_command(slot: Path, output: Path | None = None) -> list[str]:
     """Return the deterministic Remotion CLI invocation for a ProRes 4444 alpha MOV."""
     output = output or slot / "render.mov"
+    launcher = (
+        [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/s", "/c", "npx"]
+        if os.name == "nt"
+        else ["npx"]
+    )
     return [
-        "npx",
+        *launcher,
         "--no-install",
         "remotion",
         "render",
