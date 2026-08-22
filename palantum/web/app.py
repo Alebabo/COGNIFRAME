@@ -1,6 +1,7 @@
 import json
 import os
 import threading
+import time
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -381,8 +382,9 @@ def create_app(
 
     @app.get("/api/devin/config")
     def api_get_devin_config() -> dict[str, Any]:
+        devin_token = os.getenv("DEVIN_PAT") or os.getenv("DEVIN_API_KEY")
         return {
-            "devin_configured": bool(os.getenv("DEVIN_API_KEY")),
+            "devin_configured": bool(devin_token),
             "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
             "agent_backend": os.getenv("PALANTUM_AGENT_BACKEND", "devin"),
             "devin_api_url": os.getenv("DEVIN_API_URL", "https://api.devin.ai/v1"),
@@ -403,12 +405,50 @@ def create_app(
                 del os.environ["OPENAI_API_KEY"]
         if request.agent_backend is not None:
             os.environ["PALANTUM_AGENT_BACKEND"] = request.agent_backend.strip().lower()
+        devin_token = os.getenv("DEVIN_PAT") or os.getenv("DEVIN_API_KEY")
         return {
             "status": "updated",
-            "devin_configured": bool(os.getenv("DEVIN_API_KEY")),
+            "devin_configured": bool(devin_token),
             "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
             "agent_backend": os.getenv("PALANTUM_AGENT_BACKEND", "devin"),
         }
+
+    @app.post("/api/transcribe")
+    async def api_transcribe(
+        file: Annotated[UploadFile, File()]
+    ) -> JSONResponse:
+        """Transcribe uploaded audio file using OpenAI Whisper API."""
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if not openai_key:
+            raise HTTPException(
+                status_code=400, detail="OPENAI_API_KEY is not configured for transcription"
+            )
+
+        try:
+            from openai import OpenAI
+
+            client = OpenAI(api_key=openai_key)
+            suffix = Path(file.filename or "audio.webm").suffix or ".webm"
+            temp_path = root / f"temp_transcribe_{int(time.time())}{suffix}"
+            with temp_path.open("wb") as handle:
+                while chunk := await file.read(1024 * 1024):
+                    handle.write(chunk)
+
+            with temp_path.open("rb") as audio_handle:
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_handle,
+                    language="de",
+                )
+
+            if temp_path.exists():
+                temp_path.unlink()
+
+            return JSONResponse({"text": transcript.text})
+        except Exception as error:
+            raise HTTPException(
+                status_code=500, detail=f"Transcription failed: {error}"
+            ) from error
 
     @app.post("/api/devin/orchestrate")
     def api_devin_orchestrate(request: DevinOrchestrateRequest) -> dict[str, Any]:
@@ -419,11 +459,11 @@ def create_app(
         attached = dict(current.get("attached_videos", {}))
         recs = evaluate_canvas_agentic(text=text, attached_videos=attached)
 
-        devin_key = os.getenv("DEVIN_API_KEY")
+        devin_token = os.getenv("DEVIN_PAT") or os.getenv("DEVIN_API_KEY")
         devin_session_id = None
         devin_session_url = None
 
-        if devin_key and text.strip():
+        if devin_token and text.strip():
             # If Devin is configured, record orchestrator activity
             sessions_path = edit_dir / "sessions.json"
             devin_session_id = f"devin-orch-{int(os.getpid())}"
@@ -474,7 +514,7 @@ def create_app(
             "attached_videos": attached,
             "agent_cursors": agent_cursors,
             "recommendations": recs,
-            "devin_active": bool(devin_key),
+            "devin_active": bool(devin_token),
             "devin_session_url": devin_session_url,
             "devin_session_id": devin_session_id,
         }
