@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Palantum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #111111;
+    --dim: #6e6e6e;
+    --line: #e6e6e6;
+    --accent: #ff5a00;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: #ffffff;
+    color: var(--ink);
+    font-family: Inter, -apple-system, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 96px 24px 160px;
+  }
+  .center { min-height: 72vh; display: flex; flex-direction: column; justify-content: center; }
+  h1 { font-size: 16px; font-weight: 500; margin: 0 0 64px; letter-spacing: -0.01em; }
+  h1 .dot { color: var(--accent); }
+  .drop {
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 96px 24px;
+    text-align: center;
+    color: var(--dim);
+    cursor: pointer;
+    transition: border-color 180ms ease, color 180ms ease, padding 180ms ease;
+  }
+  .drop.hot { border-color: var(--accent); color: var(--ink); }
+  .drop.small { padding: 28px 24px; text-align: left; }
+  .field {
+    margin-top: 24px;
+    width: 100%;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    padding: 12px 0;
+    font: inherit;
+    color: var(--ink);
+    background: transparent;
+    outline: none;
+    transition: border-color 180ms ease;
+  }
+  .field:focus { border-bottom-color: var(--accent); }
+  .field::placeholder { color: var(--dim); }
+  #work, #done { display: none; }
+  .fade { animation: fade 180ms ease both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .dots { display: flex; gap: 12px; margin: 56px 0 8px; }
+  .beat { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 64px; }
+  .beat i {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 1px solid var(--ink);
+    transition: background 180ms ease;
+  }
+  .beat[data-status="missing"] i { background: #ffffff; border-color: var(--line); }
+  .beat[data-status="weak"] i { background: linear-gradient(90deg, var(--ink) 50%, #ffffff 50%); }
+  .beat[data-status="covered"] i { background: var(--ink); }
+  .beat span { font-size: 11px; color: var(--dim); letter-spacing: 0.04em; }
+
+  .notes { margin-top: 56px; }
+  .note { padding: 28px 0; border-top: 1px solid var(--line); }
+  .note .beatname { font-size: 11px; letter-spacing: 0.08em; color: var(--accent); }
+  .note .line { font-size: 26px; line-height: 1.28; margin: 12px 0 14px; letter-spacing: -0.02em; }
+  .note .meta { font-size: 13px; color: var(--dim); }
+  .note .why { font-size: 13px; color: var(--dim); margin-top: 6px; }
+  .note.resolved { opacity: 0.4; }
+  .note.resolved .line { text-decoration: line-through; }
+
+  .crew { margin-top: 64px; font-size: 12px; color: var(--dim); display: flex; gap: 18px; flex-wrap: wrap; }
+  .crew a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--line); }
+  .crew i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--line); margin-right: 6px; }
+  .crew .run i { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+  .crew .ok i { background: var(--ink); }
+  @keyframes pulse { 50% { opacity: 0.25; } }
+
+  video {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    max-height: 60vh;
+    background: #000;
+  }
+  .actions { display: flex; gap: 16px; margin-top: 24px; }
+  .actions a {
+    flex: 1;
+    text-align: center;
+    padding: 14px 16px;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 14px;
+    transition: background 180ms ease, color 180ms ease;
+  }
+  .actions a:hover { background: var(--ink); color: #fff; }
+  .back { display: inline-block; margin-top: 24px; font-size: 13px; color: var(--dim); cursor: pointer; }
+  .back:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Palantum<span class="dot">.</span></h1>
+
+  <section id="empty" class="center">
+    <div class="drop" id="drop">Video hier ablegen</div>
+    <input class="field" id="brief" placeholder="Skript, Produktbeschreibung oder Link">
+    <input type="file" id="picker" accept="video/*" multiple hidden>
+  </section>
+
+  <section id="work">
+    <div class="drop small" id="drop2">Weiteren Take ablegen</div>
+    <div class="dots" id="dots"></div>
+    <div class="notes" id="notes"></div>
+    <div class="crew" id="crew"></div>
+  </section>
+
+  <section id="done">
+    <video id="player" controls playsinline></video>
+    <div class="actions">
+      <a id="dl-video" href="#">Video herunterladen</a>
+      <a id="dl-project" href="#">Projekt herunterladen</a>
+    </div>
+    <span class="back" id="back">Zurück zur Regie</span>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const MOCK = new URLSearchParams(location.search).get('mock');
+
+function show(phase) {
+  for (const id of ['empty', 'work', 'done']) {
+    const el = $(id);
+    const on = (id === phase);
+    el.style.display = on ? (id === 'empty' ? 'flex' : 'block') : 'none';
+    if (on) { el.classList.remove('fade'); void el.offsetWidth; el.classList.add('fade'); }
+  }
+}
+
+function renderCoverage(beats) {
+  $('dots').innerHTML = beats.map(b =>
+    `<div class="beat" data-status="${b.status}" title="${b.reason || ''}"><i></i><span>${b.id.slice(0, 4)}</span></div>`
+  ).join('');
+}
+
+function renderNotes(notes) {
+  const rank = { high: 0, medium: 1, low: 2 };
+  const sorted = [...notes].sort((a, b) =>
+    (a.resolved - b.resolved) || (rank[a.impact] - rank[b.impact]));
+  $('notes').innerHTML = sorted.map(n => `
+    <div class="note ${n.resolved ? 'resolved' : ''}">
+      <div class="beatname">${n.beat}</div>
+      <div class="line">${n.shot.line}</div>
+      <div class="meta">${n.shot.framing} · ${n.shot.duration_s}s · ${n.shot.delivery}</div>
+      <div class="why">${n.why}</div>
+    </div>`).join('');
+}
+
+function renderCrew(sessions) {
+  $('crew').innerHTML = sessions.map(s => {
+    const cls = s.status === 'running' ? 'run' : (s.status === 'done' ? 'ok' : '');
+    const label = `<i></i>${s.role}`;
+    return s.url ? `<a class="${cls}" href="${s.url}" target="_blank">${label}</a>`
+                 : `<span class="${cls}">${label}</span>`;
+  }).join('');
+}
+
+function apply(state) {
+  if (state.phase === 'empty') { show('empty'); return; }
+  renderCoverage(state.coverage.beats);
+  renderNotes(state.notes);
+  renderCrew(state.sessions);
+  if (state.phase === 'done' && state.video_url) {
+    $('player').src = state.video_url;
+    $('dl-video').href = state.video_url;
+    $('dl-project').href = state.export_url;
+    show('done');
+  } else {
+    show('work');
+  }
+}
+
+async function poll() {
+  if (MOCK) return;
+  try {
+    const r = await fetch('/api/state');
+    apply(await r.json());
+  } catch (e) { /* server not up yet */ }
+  setTimeout(poll, 1500);
+}
+
+async function upload(files) {
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+  const brief = $('brief').value.trim();
+  if (brief) fd.append('brief', brief);
+  show('work');
+  await fetch('/api/upload', { method: 'POST', body: fd });
+}
+
+for (const zone of [$('drop'), $('drop2')]) {
+  zone.addEventListener('click', () => $('picker').click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('hot'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('hot'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('hot');
+    if (e.dataTransfer.files.length) upload(e.dataTransfer.files);
+  });
+}
+$('picker').addEventListener('change', e => { if (e.target.files.length) upload(e.target.files); });
+$('back').addEventListener('click', () => show('work'));
+
+if (MOCK) {
+  fetch(`mock_state_${MOCK}.json`).then(r => r.json()).then(apply);
+} else {
+  poll();
+}
+</script>
+</body>
+</html>
