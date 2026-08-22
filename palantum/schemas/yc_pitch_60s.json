@@ -1,0 +1,64 @@
+{
+  "schema": "yc_pitch_60s",
+  "label": "YC-style 60s pitch",
+  "target_duration_s": 60,
+  "format": "9:16",
+  "beats": [
+    {
+      "id": "HOOK",
+      "required": true,
+      "min_duration_s": 3,
+      "max_duration_s": 6,
+      "covered_when": "The first 1.5s carry a concrete claim. A greeting, a name, or a company intro does not count."
+    },
+    {
+      "id": "PROBLEM",
+      "required": true,
+      "min_duration_s": 6,
+      "max_duration_s": 10,
+      "covered_when": "Names who suffers and what the pain is. A market category is not a problem."
+    },
+    {
+      "id": "SOLUTION",
+      "required": true,
+      "min_duration_s": 8,
+      "max_duration_s": 14,
+      "covered_when": "Describes the mechanism — how it works. Adjectives about the product do not count."
+    },
+    {
+      "id": "DEMO",
+      "required": true,
+      "min_duration_s": 8,
+      "max_duration_s": 15,
+      "covered_when": "Visual material of the product exists in the footage. A talking head describing the product does not count."
+    },
+    {
+      "id": "TRACTION",
+      "required": false,
+      "min_duration_s": 4,
+      "max_duration_s": 8,
+      "covered_when": "At least one spoken number with a time reference."
+    },
+    {
+      "id": "TEAM",
+      "required": false,
+      "min_duration_s": 3,
+      "max_duration_s": 6,
+      "covered_when": "Names people and their unfair advantage."
+    },
+    {
+      "id": "ASK",
+      "required": true,
+      "min_duration_s": 3,
+      "max_duration_s": 5,
+      "covered_when": "A call to action with an object — what the viewer should do, and with what."
+    }
+  ],
+  "graphics_map": {
+    "PROBLEM": "stat_reveal",
+    "SOLUTION": "mechanism_diagram",
+    "DEMO": "ui_frame",
+    "TRACTION": "metric_card",
+    "ASK": "lower_third"
+  }
+}

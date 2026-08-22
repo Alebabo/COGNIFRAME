@@ -1,0 +1,6 @@
+{
+  "words": [
+    {"word": "Hello", "start": 0.10, "end": 0.40},
+    {"word": "world", "start": 1.00, "end": 1.40}
+  ]
+}
