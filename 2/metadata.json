@@ -1,0 +1,93 @@
+{
+  "cli_version": "0.10.2",
+  "checkpoint_id": "01M0PD430R24XK43W30XZT642Y",
+  "session_id": "01a02c95-91e8-7882-b9e9-cf7a7fee56b1",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-23T04:14:28.5040459Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/motion-pack.md",
+    "palantum/agents/backends/devin.py",
+    "palantum/agents/prompts/a6_graphics_director.md",
+    "palantum/agents/runner.py",
+    "palantum/engine/render_bridge.py",
+    "palantum/motion/catalog.py",
+    "palantum/motion/harness.py",
+    "palantum/orchestrator.py",
+    "tests/test_chunks.py",
+    "tests/test_devin.py",
+    "tests/test_motion.py",
+    "tests/test_orchestrator_motion.py",
+    "tests/test_render_bridge.py",
+    "tests/test_runner.py"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.6-sol",
+  "turn_id": "d4a7884fcd4c",
+  "checkpoint_transcript_start": 687,
+  "transcript_lines_at_start": 687,
+  "compact_transcript_start": 97,
+  "token_usage": {
+    "input_tokens": 198999,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 9285376,
+    "output_tokens": 39150,
+    "api_call_count": 89
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-23T04:14:28.1245842Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 774,
+    "human_removed": 1921,
+    "total_committed": 0,
+    "total_lines_changed": 2695,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 3482,
+      "user_lines_removed": 2797,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/motion-pack.md": 5,
+        "palantum/agents/backends/devin.py": 253,
+        "palantum/agents/prompts/a6_graphics_director.md": 16,
+        "palantum/agents/runner.py": 150,
+        "palantum/engine/render_bridge.py": 160,
+        "palantum/motion/catalog.py": 19,
+        "palantum/motion/harness.py": 39,
+        "palantum/orchestrator.py": 1290,
+        "scripts/make_fixtures.py": 188,
+        "scripts/setup_engine.sh": 3,
+        "tests/test_chunks.py": 373,
+        "tests/test_devin.py": 493,
+        "tests/test_motion.py": 18,
+        "tests/test_orchestrator_motion.py": 228,
+        "tests/test_render_bridge.py": 85,
+        "tests/test_runner.py": 162
+      },
+      "user_removed_per_file": {
+        "palantum/agents/backends/devin.py": 202,
+        "palantum/agents/prompts/a6_graphics_director.md": 14,
+        "palantum/agents/runner.py": 86,
+        "palantum/engine/render_bridge.py": 48,
+        "palantum/motion/catalog.py": 2,
+        "palantum/motion/harness.py": 14,
+        "palantum/orchestrator.py": 1191,
+        "scripts/make_fixtures.py": 188,
+        "scripts/setup_engine.sh": 3,
+        "tests/test_chunks.py": 326,
+        "tests/test_devin.py": 438,
+        "tests/test_orchestrator_motion.py": 194,
+        "tests/test_render_bridge.py": 33,
+        "tests/test_runner.py": 58
+      }
+    }
+  ]
+}
