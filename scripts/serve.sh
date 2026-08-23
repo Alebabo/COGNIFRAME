@@ -16,7 +16,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-set -- uv run --no-env-file palantum --videos-dir "$videos_dir" serve \
+set -- uv run --no-env-file pitchcraft --videos-dir "$videos_dir" serve \
   --host "$host_address" --port "$port"
 if [ -n "$template_source" ]; then
   set -- "$@" --template-source "$template_source"

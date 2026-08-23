@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from palantum.engine import videouse
+from pitchcraft.engine import videouse
 
 
 def test_run_helper_uses_active_python(monkeypatch: Any, tmp_path: Path) -> None:
@@ -29,7 +29,7 @@ def test_run_helper_uses_active_python(monkeypatch: Any, tmp_path: Path) -> None
     assert seen == [result.command]
     assert options["encoding"] == "utf-8"
     assert isinstance(options["env"], dict)
-    assert options["env"]["PYTHONUTF8"] == "1"  # type: ignore[index]
+    assert options["env"]["PYTHONUTF8"] == "1"
 
 
 def test_render_helper_uses_windows_compatibility_bridge(

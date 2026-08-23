@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from palantum.agents.backends.devin import DevinCallResult
-from palantum.agents.runner import _record_session, run_role
+from pitchcraft.agents.backends.devin import DevinCallResult
+from pitchcraft.agents.runner import _record_session, run_role
 
 
 def test_devin_backend_is_the_default_and_records_response_url(tmp_path: Path) -> None:
@@ -18,7 +18,7 @@ def test_devin_backend_is_the_default_and_records_response_url(tmp_path: Path) -
     state_path = tmp_path / "sessions.json"
     with (
         patch.dict("os.environ", {}, clear=True),
-        patch("palantum.agents.backends.devin.call", return_value=result) as call,
+        patch("pitchcraft.agents.backends.devin.call", return_value=result) as call,
     ):
         output = run_role("A7", "prompt", {"_session_state_path": str(state_path)}, None)
     assert output == valid
@@ -28,7 +28,7 @@ def test_devin_backend_is_the_default_and_records_response_url(tmp_path: Path) -
 
 def test_non_devin_agent_backend_is_rejected() -> None:
     with (
-        patch.dict("os.environ", {"PALANTUM_AGENT_BACKEND": "openai"}),
+        patch.dict("os.environ", {"PITCHCRAFT_AGENT_BACKEND": "openai"}),
         pytest.raises(ValueError, match="require the Devin backend"),
     ):
         run_role("A7", "prompt", {}, None)
@@ -78,11 +78,11 @@ def test_a4_can_revise_once_in_the_same_devin_session(tmp_path: Path) -> None:
         )
     with (
         patch(
-            "palantum.agents.backends.devin.call",
+            "pitchcraft.agents.backends.devin.call",
             return_value=DevinCallResult(initial, "session-a4", url),
         ) as call,
         patch(
-            "palantum.agents.backends.devin.continue_session",
+            "pitchcraft.agents.backends.devin.continue_session",
             return_value=DevinCallResult(revised, "session-a4", url),
         ) as revise,
     ):
@@ -123,8 +123,8 @@ def test_a4_stops_after_one_failed_revision(tmp_path: Path) -> None:
     }
     result = DevinCallResult(invalid, "session-a4", "https://app/session-a4")
     with (
-        patch("palantum.agents.backends.devin.call", return_value=result),
-        patch("palantum.agents.backends.devin.continue_session", return_value=result) as revise,
+        patch("pitchcraft.agents.backends.devin.call", return_value=result),
+        patch("pitchcraft.agents.backends.devin.continue_session", return_value=result) as revise,
         pytest.raises(ValueError, match="after one revision"),
     ):
         run_role(

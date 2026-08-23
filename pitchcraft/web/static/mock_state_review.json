@@ -1,0 +1,72 @@
+{
+  "phase": "review",
+  "coverage": {
+    "score": 0.86,
+    "beats": [
+      {"id": "HOOK", "status": "covered", "reason": ""},
+      {"id": "PROBLEM", "status": "covered", "reason": ""},
+      {"id": "SOLUTION", "status": "covered", "reason": ""}
+    ]
+  },
+  "chunks": [
+    {
+      "id": "chunk-00-hook",
+      "order": 0,
+      "beat": "HOOK",
+      "selected": "a",
+      "recommendation": {
+        "status": "ready",
+        "variant_id": "b",
+        "reason": "The motion version delivers the opening more precisely and cleanly."
+      },
+      "variants": [
+        {
+          "id": "a",
+          "label": "Version A",
+          "name": "Clean Cut",
+          "strategy": "Calmer opening with a natural pause and focus on the speaker.",
+          "video_url": "/api/video"
+        },
+        {
+          "id": "b",
+          "label": "Version B",
+          "name": "Motion Cut",
+          "strategy": "Tighter opening with a faster rhythm and room for UI motion.",
+          "video_url": "/api/video"
+        }
+      ]
+    },
+    {
+      "id": "chunk-01-solution",
+      "order": 1,
+      "beat": "SOLUTION",
+      "selected": null,
+      "recommendation": {
+        "status": "unavailable",
+        "variant_id": null,
+        "reason": "The AI recommendation is currently unavailable."
+      },
+      "variants": [
+        {
+          "id": "a",
+          "label": "Version A",
+          "name": "Clean Cut",
+          "strategy": "The explanation remains complete and the speaker stays visually dominant.",
+          "video_url": "/api/video"
+        },
+        {
+          "id": "b",
+          "label": "Version B",
+          "name": "Motion Cut",
+          "strategy": "Compact explanation with an integrated product interface and motion cards.",
+          "video_url": "/api/video"
+        }
+      ]
+    }
+  ],
+  "selection_complete": false,
+  "video_url": null,
+  "export_url": null,
+  "notes": [],
+  "sessions": []
+}

@@ -1,5 +1,5 @@
 [project]
-name = "palantum"
+name = "pitchcraft"
 version = "0.1.0"
 description = "Director layer for startup pitch videos"
 requires-python = ">=3.11"
@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-palantum = "palantum.cli:main"
+pitchcraft = "pitchcraft.cli:main"
 
 [tool.uv]
 package = true

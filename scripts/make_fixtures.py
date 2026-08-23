@@ -11,7 +11,7 @@ from pathlib import Path
 
 TAKES = {
     "take_1": (
-        "Two hours of browser-test triage become two minutes with Palantum. "
+        "Two hours of browser-test triage become two minutes with Pitchcraft. "
         "Developers lose time when flaky browser tests delay releases and frustrate customers."
     ),
     "take_2": (
@@ -24,7 +24,7 @@ TAKES = {
     ),
 }
 TRACTION = "In the last three months, 120 teams joined our beta and cut triage time in half."
-DEMO = "Palantum groups every failing run by root cause, so one click opens the exact fix."
+DEMO = "Pitchcraft groups every failing run by root cause, so one click opens the exact fix."
 
 
 def tts(text: str, destination: Path) -> None:
@@ -62,7 +62,7 @@ def duration(path: Path) -> float:
 
 def make_video(text: str, output: Path, color: str, audio_speed: float = 1.0) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="palantum-fixture-") as directory:
+    with tempfile.TemporaryDirectory(prefix="pitchcraft-fixture-") as directory:
         audio = Path(directory) / "voice.wav"
         tts(text, audio)
         audio_filter = f"atempo={audio_speed}" if audio_speed != 1.0 else None
@@ -101,7 +101,7 @@ def make_video(text: str, output: Path, color: str, audio_speed: float = 1.0) ->
 
 def make_demo_video(output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="palantum-demo-") as directory:
+    with tempfile.TemporaryDirectory(prefix="pitchcraft-demo-") as directory:
         audio = Path(directory) / "voice.wav"
         tts(DEMO, audio)
         font = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
@@ -109,7 +109,7 @@ def make_demo_video(output: Path) -> None:
             [
                 "drawbox=x=55:y=70:w=970:h=1780:color=white:t=fill,",
                 "drawbox=x=55:y=70:w=970:h=150:color=0x111827:t=fill,",
-                f"drawtext=fontfile={font}:text='PALANTUM':fontcolor=white:fontsize=52:x=100:y=115,",
+                f"drawtext=fontfile={font}:text='PITCHCRAFT':fontcolor=white:fontsize=52:x=100:y=115,",
                 (
                     f"drawtext=fontfile={font}:text='RUNS / FAILURES':"
                     "fontcolor=0x111827:fontsize=34:x=105:y=290,"

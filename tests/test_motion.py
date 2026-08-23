@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from palantum.motion.catalog import CURATED_SCENES, build_scene_catalog
-from palantum.motion.harness import build_render_command, materialize_scene
+from pitchcraft.motion.catalog import CURATED_SCENES, build_scene_catalog
+from pitchcraft.motion.harness import build_render_command, materialize_scene
 
 
 def _pack(root: Path, *, broken: str | None = None) -> Path:
@@ -116,8 +116,8 @@ def test_materialize_creates_isolated_harness_and_validates_props(tmp_path: Path
     assert (slot / "src/Composition.tsx").exists()
     assert "HeroStatCallout" in (slot / "src/Root.tsx").read_text()
     assert json.loads((slot / "props.json").read_text()) == {"title": "Traction"}
-    assert json.loads((slot / "palantum-slot.json").read_text())["source_sha256"]
-    assert json.loads((slot / "palantum-slot.json").read_text())["presentation"] == "inset"
+    assert json.loads((slot / "pitchcraft-slot.json").read_text())["source_sha256"]
+    assert json.loads((slot / "pitchcraft-slot.json").read_text())["presentation"] == "inset"
     command = build_render_command(slot)
     if os.name == "nt":
         assert command[1:5] == ["/d", "/s", "/c", "npx"]
@@ -131,7 +131,7 @@ def test_materialize_creates_isolated_harness_and_validates_props(tmp_path: Path
         archive, "hero-stat-callout", edit, {"title": "Traction"}, slot_id="problem-01"
     )
     assert named == edit / "animations/slot_problem-01"
-    assert json.loads((named / "palantum-slot.json").read_text())["output"] == "render.mov"
+    assert json.loads((named / "pitchcraft-slot.json").read_text())["output"] == "render.mov"
 
     portrait = materialize_scene(
         archive,
@@ -142,7 +142,7 @@ def test_materialize_creates_isolated_harness_and_validates_props(tmp_path: Path
         target_width=1080,
         target_height=1920,
     )
-    portrait_manifest = json.loads((portrait / "palantum-slot.json").read_text())
+    portrait_manifest = json.loads((portrait / "pitchcraft-slot.json").read_text())
     assert (portrait_manifest["target_width"], portrait_manifest["target_height"]) == (1080, 1920)
     root = (portrait / "src/Root.tsx").read_text()
     assert "scale(0.29250000)" in root

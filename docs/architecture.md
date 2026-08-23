@@ -1,6 +1,6 @@
-# COGNIFRAME / Palantum — implemented architecture
+# COGNIFRAME / Pitchcraft — implemented architecture
 
-COGNIFRAME is an autonomous pitch-video production layer on top of the Devin API. `palantum` is
+COGNIFRAME is an autonomous pitch-video production layer on top of the Devin API. `pitchcraft` is
 the package name. Devin sessions make semantic editorial decisions; a deterministic Python state
 machine validates and coordinates them; pinned `browser-use/video-use`, FFmpeg, and Remotion
 execute the accepted plan and return separable tracks.
@@ -8,8 +8,8 @@ execute the accepted plan and return separable tracks.
 ## Layout
 
 ```
-palantum/
-  cli.py               # terminal loop: palantum ingest / status / cut / export
+pitchcraft/
+  cli.py               # terminal loop: pitchcraft ingest / status / cut / export
   orchestrator.py      # deterministic state machine; owns conflict resolution, no LLM
   state.py             # coverage.json read/write + validation
   schemas/
@@ -112,7 +112,7 @@ authoritative and can veto A7. Without image evidence, A7 must mark image-depend
 
 ## Web API contract
 
-`palantum/web/static/index.html` is the whole frontend: one white page, four states
+`pitchcraft/web/static/index.html` is the whole frontend: one white page, four states
 (empty → working → review → done), no build step. It renders from one endpoint and polls it every 1.5 s.
 `?mock=work|review|done|empty` renders the same page against checked-in fixture files instead of the
 server, which is how the page is developed and verified without a backend.

@@ -1,0 +1,122 @@
+{
+  "phase": "done",
+  "coverage": {
+    "score": 0.93,
+    "beats": [
+      {
+        "id": "HOOK",
+        "status": "covered",
+        "reason": "Concrete statement in 0.4s, no intro."
+      },
+      {
+        "id": "PROBLEM",
+        "status": "covered",
+        "reason": "Names the affected user and the cost."
+      },
+      {
+        "id": "SOLUTION",
+        "status": "covered",
+        "reason": "Describes value, not mechanism."
+      },
+      {
+        "id": "DEMO",
+        "status": "weak",
+        "reason": "No visual product footage in the source material."
+      },
+      {
+        "id": "TRACTION",
+        "status": "weak",
+        "reason": "No spoken number in any take."
+      },
+      {
+        "id": "TEAM",
+        "status": "covered",
+        "reason": "Names people with an unfair advantage."
+      },
+      {
+        "id": "ASK",
+        "status": "covered",
+        "reason": "Call to action without an object."
+      }
+    ]
+  },
+  "notes": [
+    {
+      "beat": "TRACTION",
+      "impact": "high",
+      "resolved": true,
+      "why": "No take contains a spoken number. Investors read missing numbers as 'there are none'.",
+      "shot": {
+        "line": "Say verbatim: “Since March, we have 1,200 users and €40,000 ARR.” Adjust the numbers.",
+        "framing": "Same setup as Take C0103, medium shot, same background",
+        "duration_s": 6,
+        "delivery": "Calm, not euphoric. Say the numbers more slowly than the rest."
+      }
+    },
+    {
+      "beat": "DEMO",
+      "impact": "high",
+      "resolved": true,
+      "why": "You describe the product, but it is never shown. Without a visual, the claim remains unsubstantiated.",
+      "shot": {
+        "line": "Screen recording: start a run and show how the agent makes the edit — no commentary.",
+        "framing": "Screen recording 1080x1920, window without tabs or notifications",
+        "duration_s": 12,
+        "delivery": "No narration, just movement. No cursor shake."
+      }
+    },
+    {
+      "beat": "ASK",
+      "impact": "medium",
+      "resolved": true,
+      "why": "“Get in touch” has no object — nobody knows what to do.",
+      "shot": {
+        "line": "Say verbatim: “If you invest in developer tools, reply to this email.”",
+      "framing": "Same setup as Take C0103, medium shot",
+        "duration_s": 4,
+        "delivery": "Look directly into the camera, one sentence, then silence."
+      }
+    },
+    {
+      "beat": "PROBLEM",
+      "impact": "medium",
+      "resolved": true,
+      "why": "Closed by Take C0107.",
+      "shot": {
+        "line": "Say who suffers and what it costs them — not the category.",
+      "framing": "Same setup as Take C0103, medium shot",
+        "duration_s": 8,
+        "delivery": "Matter-of-fact."
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "role": "Script Supervisor",
+      "status": "done",
+      "url": null
+    },
+    {
+      "role": "Director",
+      "status": "done",
+      "url": null
+    },
+    {
+      "role": "Strategist",
+      "status": "done",
+      "url": null
+    },
+    {
+      "role": "Cutter",
+      "status": "done",
+      "url": null
+    },
+    {
+      "role": "QC",
+      "status": "done",
+      "url": null
+    }
+  ],
+  "video_url": "sample.mp4",
+  "export_url": "#"
+}

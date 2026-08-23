@@ -2,20 +2,20 @@
 
 ```powershell
 python scripts/setup_engine.py
-palantum doctor --template-source "C:\path\to\templates.zip"
-palantum ingest take.mp4 --template-source "C:\path\to\templates.zip"
-palantum cut --template-source "C:\path\to\templates.zip"
+pitchcraft doctor --template-source "C:\path\to\templates.zip"
+pitchcraft ingest take.mp4 --template-source "C:\path\to\templates.zip"
+pitchcraft cut --template-source "C:\path\to\templates.zip"
 ```
 
-The template path can instead be supplied once as `PALANTUM_TEMPLATE_SOURCE`. Production agent
+The template path can instead be supplied once as `PITCHCRAFT_TEMPLATE_SOURCE`. Production agent
 decisions require `DEVIN_API_KEY`; `DEVIN_SNAPSHOT_ID` is optional.
 
-Palantum does not redistribute the supplied Locomotion template sources. At runtime,
-`palantum.motion.build_scene_catalog()` reads either the original ZIP or an extracted directory,
+Pitchcraft does not redistribute the supplied Locomotion template sources. At runtime,
+`pitchcraft.motion.build_scene_catalog()` reads either the original ZIP or an extracted directory,
 hashes the complete source, and writes a cached `edit/scene-catalog.json` containing only the eight
 curated scene descriptions and slot defaults.
 
-`palantum.motion.materialize_scene()` copies only the selected component and its metadata into
+`pitchcraft.motion.materialize_scene()` copies only the selected component and its metadata into
 `edit/animations/slot_<scene-id>/`. The generated directory is an isolated Remotion project with
 validated props and exact dependency versions. Install its npm dependencies inside the Devin
 snapshot, then execute the list returned by `build_render_command()` to request a ProRes 4444 MOV.
@@ -27,7 +27,7 @@ transparent, top-right inset; it is rejected if it remains too opaque. Known ful
 catalogued as insets from the start. The generated harness always renders at the detected delivery
 orientation, so landscape delivery remains 1920x1080 and portrait delivery is 1080x1920.
 
-Scenes containing charts, flows, UI, cards, or other shapes are catalogued as `structured`. Palantum
+Scenes containing charts, flows, UI, cards, or other shapes are catalogued as `structured`. Pitchcraft
 keeps them visible for at least 4.5 seconds when their beat permits, slows their animation when extra
 time is available, and preserves roughly one second on the final frame. Burned-in subtitles are
 removed only for the active motion intervals and return immediately afterwards.

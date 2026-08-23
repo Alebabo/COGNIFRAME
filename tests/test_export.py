@@ -4,11 +4,12 @@ import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
-from palantum.export import package
+from pitchcraft.export import package
 
 
-def test_export_writes_fps_aware_zero_based_timelines(tmp_path: Path, monkeypatch: object) -> None:
+def test_export_writes_fps_aware_zero_based_timelines(tmp_path: Path, monkeypatch: Any) -> None:
     edit = tmp_path / "edit"
     clips = edit / "clips_graded"
     visual = edit / "visual"
@@ -66,7 +67,9 @@ def test_export_writes_fps_aware_zero_based_timelines(tmp_path: Path, monkeypatc
         "subtitles",
     }
     assert sequence.attrib["duration"] == "125/25s"
-    assert root.find("./resources/format").attrib["frameDuration"] == "1/25s"
+    format_node = root.find("./resources/format")
+    assert format_node is not None
+    assert format_node.attrib["frameDuration"] == "1/25s"
     assert all(node.attrib["start"] == "0/25s" for node in root.findall("./resources/asset"))
     assert all(node.attrib["start"] == "0/25s" for node in root.findall(".//asset-clip"))
     assert (output / "media/aroll").joinpath("aroll_00_seg_00_take_a.mp4").exists()

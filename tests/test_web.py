@@ -4,11 +4,12 @@ import json
 import os
 import threading
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from palantum.web.app import (
+from pitchcraft.web.app import (
     _finalize_selection,
     _load_env,
     _process_chunk_recommendations,
@@ -23,7 +24,7 @@ from palantum.web.app import (
 def test_local_env_never_overrides_injected_process_value(tmp_path: Path) -> None:
     (tmp_path / ".env").write_text("DEVIN_API_KEY=stale-local-key\n", encoding="utf-8")
     with patch.dict(os.environ, {"DEVIN_API_KEY": "injected-key"}, clear=False):
-        with patch("palantum.web.app.Path.cwd", return_value=tmp_path):
+        with patch("pitchcraft.web.app.Path.cwd", return_value=tmp_path):
             _load_env()
         assert os.environ["DEVIN_API_KEY"] == "injected-key"
 
@@ -33,7 +34,7 @@ def test_safe_launchers_disable_uv_env_file_loading() -> None:
     powershell = (root / "scripts/serve.ps1").read_text()
     assert '"--no-env-file"' in powershell
     assert "& uv" in powershell
-    assert "uv run --no-env-file palantum" in (root / "scripts/serve.sh").read_text()
+    assert "uv run --no-env-file pitchcraft" in (root / "scripts/serve.sh").read_text()
 
 
 def test_state_payload_maps_done_and_resolved_notes(tmp_path: Path) -> None:
@@ -63,16 +64,16 @@ def test_state_payload_maps_done_and_resolved_notes(tmp_path: Path) -> None:
 
 def test_script_endpoint_streams_text_and_identifies_generator(tmp_path: Path) -> None:
     with patch(
-        "palantum.web.app.create_script_stream",
-        return_value=(iter(["HOOK\n", "Ein klarer Einstieg."]), "devin"),
+        "pitchcraft.web.app.create_script_stream",
+        return_value=(iter(["HOOK\n", "A clear opening."]), "devin"),
     ):
         response = TestClient(create_app(tmp_path)).post(
-            "/api/script", json={"prompt": "Unser Produkt soll den Ablauf erklären."}
+            "/api/script", json={"prompt": "Our product should explain the workflow."}
         )
 
     assert response.status_code == 200
-    assert response.text == "HOOK\nEin klarer Einstieg."
-    assert response.headers["x-palantum-generator"] == "devin"
+    assert response.text == "HOOK\nA clear opening."
+    assert response.headers["x-pitchcraft-generator"] == "devin"
 
 
 def test_script_endpoint_rejects_empty_prompt(tmp_path: Path) -> None:
@@ -84,14 +85,14 @@ def test_script_endpoint_rejects_empty_prompt(tmp_path: Path) -> None:
 def test_background_failure_is_exposed_in_state(tmp_path: Path) -> None:
     source = tmp_path / "take.mp4"
     source.write_bytes(b"source")
-    with patch("palantum.web.app.analyze", side_effect=KeyError("OPENAI_API_KEY")):
+    with patch("pitchcraft.web.app.analyze", side_effect=KeyError("OPENAI_API_KEY")):
         _process_upload(tmp_path, [source], None)
 
     result = state_payload(tmp_path)
 
     assert result["phase"] == "error"
     assert result["job_status"] == "failed"
-    assert result["error"] == "OPENAI_API_KEY fehlt. Bitte den Schlüssel in der .env konfigurieren."
+    assert result["error"] == "OPENAI_API_KEY is missing. Configure the key in .env."
 
 
 def test_state_payload_exposes_precise_video_job_status(tmp_path: Path) -> None:
@@ -118,7 +119,7 @@ def test_upload_passes_motion_pack_to_background_job(tmp_path: Path) -> None:
     template = tmp_path / "templates.zip"
     template.write_bytes(b"zip")
     client = TestClient(create_app(tmp_path, template))
-    with patch("palantum.web.app._EXECUTOR.submit") as submit:
+    with patch("pitchcraft.web.app._EXECUTOR.submit") as submit:
         response = client.post(
             "/api/upload", files={"files": ("take.mp4", b"video", "video/mp4")}
         )
@@ -155,13 +156,13 @@ def test_background_upload_builds_chunk_review_from_all_sources(tmp_path: Path) 
     second.write_bytes(b"two")
     state = {"meta": {"sources": [str(first), str(second)]}}
     with (
-        patch("palantum.web.app.analyze") as analyze,
-        patch("palantum.web.app.load", return_value=state),
+        patch("pitchcraft.web.app.analyze") as analyze,
+        patch("pitchcraft.web.app.load", return_value=state),
         patch(
-            "palantum.web.app.build_chunk_variants",
+            "pitchcraft.web.app.build_chunk_variants",
             return_value={"generation_id": "generation-1"},
         ) as build,
-        patch("palantum.web.app._RECOMMENDATION_EXECUTOR.submit") as submit,
+        patch("pitchcraft.web.app._RECOMMENDATION_EXECUTOR.submit") as submit,
     ):
         _process_upload(tmp_path, [first, second], "brief")
 
@@ -183,7 +184,7 @@ def test_review_and_manual_selection_are_available_before_delayed_a5(
     source = tmp_path / "take.mp4"
     source.write_bytes(b"source")
     edit = tmp_path / "edit"
-    manifest = {
+    manifest: dict[str, Any] = {
         "generation_id": "generation-delayed",
         "status": "review",
         "recommendations_status": "pending",
@@ -202,13 +203,13 @@ def test_review_and_manual_selection_are_available_before_delayed_a5(
         return manifest
 
     with (
-        patch("palantum.web.app.analyze"),
+        patch("pitchcraft.web.app.analyze"),
         patch(
-            "palantum.web.app.load",
+            "pitchcraft.web.app.load",
             return_value={"meta": {"sources": [str(source)]}},
         ),
-        patch("palantum.web.app.build_chunk_variants", side_effect=build),
-        patch("palantum.web.app._RECOMMENDATION_EXECUTOR.submit") as submit,
+        patch("pitchcraft.web.app.build_chunk_variants", side_effect=build),
+        patch("pitchcraft.web.app._RECOMMENDATION_EXECUTOR.submit") as submit,
     ):
         _process_upload(tmp_path, [source], None)
 
@@ -228,7 +229,7 @@ def test_review_and_manual_selection_are_available_before_delayed_a5(
     )
     worker, *args = submit.call_args.args
     with patch(
-        "palantum.web.app.recommend_chunk_variants",
+        "pitchcraft.web.app.recommend_chunk_variants",
         return_value={
             "one": {"status": "ready", "variant_id": "b", "reason": "Motion"}
         },
@@ -243,7 +244,7 @@ def test_review_and_manual_selection_are_available_before_delayed_a5(
 def test_a5_timeout_stays_optional_and_keeps_review_selectable(tmp_path: Path) -> None:
     edit = tmp_path / "edit"
     edit.mkdir()
-    manifest = {
+    manifest: dict[str, Any] = {
         "generation_id": "generation-timeout",
         "chunks": [
             {
@@ -257,7 +258,7 @@ def test_a5_timeout_stays_optional_and_keeps_review_selectable(tmp_path: Path) -
     (edit / "job.json").write_text(json.dumps({"status": "review"}), encoding="utf-8")
 
     with patch(
-        "palantum.web.app.recommend_chunk_variants",
+        "pitchcraft.web.app.recommend_chunk_variants",
         side_effect=TimeoutError("A5 timed out"),
     ):
         updated = _process_chunk_recommendations(tmp_path, "generation-timeout")
@@ -301,7 +302,7 @@ def test_stale_a5_batch_cannot_mutate_a_newer_manifest(tmp_path: Path) -> None:
         assert release.wait(3)
         return {"one": {"status": "ready", "variant_id": "a", "reason": "A"}}
 
-    with patch("palantum.web.app.recommend_chunk_variants", side_effect=delayed):
+    with patch("pitchcraft.web.app.recommend_chunk_variants", side_effect=delayed):
         worker = threading.Thread(
             target=lambda: outcome.append(
                 _process_chunk_recommendations(tmp_path, "generation-old")
@@ -321,7 +322,7 @@ def test_stale_a5_batch_cannot_mutate_a_newer_manifest(tmp_path: Path) -> None:
 def test_a5_merge_preserves_a_concurrent_manual_selection(tmp_path: Path) -> None:
     edit = tmp_path / "edit"
     edit.mkdir()
-    manifest = {
+    manifest: dict[str, Any] = {
         "generation_id": "generation-concurrent",
         "chunks": [
             {"id": "one", "selected": None, "variants": [{"id": "a"}, {"id": "b"}]}
@@ -338,7 +339,7 @@ def test_a5_merge_preserves_a_concurrent_manual_selection(tmp_path: Path) -> Non
         assert release.wait(3)
         return {"one": {"status": "ready", "variant_id": "a", "reason": "A"}}
 
-    with patch("palantum.web.app.recommend_chunk_variants", side_effect=delayed):
+    with patch("pitchcraft.web.app.recommend_chunk_variants", side_effect=delayed):
         worker = threading.Thread(
             target=lambda: outcome.append(
                 _process_chunk_recommendations(tmp_path, "generation-concurrent")
@@ -364,7 +365,7 @@ def test_a5_merge_preserves_a_concurrent_manual_selection(tmp_path: Path) -> Non
 def test_a5_batch_is_skipped_after_job_leaves_review(tmp_path: Path) -> None:
     edit = tmp_path / "edit"
     edit.mkdir()
-    manifest = {
+    manifest: dict[str, Any] = {
         "generation_id": "generation-finalizing",
         "chunks": [
             {"id": "one", "selected": "a", "variants": [{"id": "a"}, {"id": "b"}]}
@@ -382,7 +383,7 @@ def test_a5_batch_is_skipped_after_job_leaves_review(tmp_path: Path) -> None:
         assert release.wait(3)
         return {"one": {"status": "ready", "variant_id": "b", "reason": "B"}}
 
-    with patch("palantum.web.app.recommend_chunk_variants", side_effect=delayed):
+    with patch("pitchcraft.web.app.recommend_chunk_variants", side_effect=delayed):
         worker = threading.Thread(
             target=lambda: outcome.append(
                 _process_chunk_recommendations(tmp_path, "generation-finalizing")
@@ -405,7 +406,7 @@ def test_a5_submit_failure_finishes_pending_state_without_blocking_review(
     source = tmp_path / "take.mp4"
     source.write_bytes(b"source")
     edit = tmp_path / "edit"
-    manifest = {
+    manifest: dict[str, Any] = {
         "generation_id": "generation-submit-failed",
         "status": "review",
         "recommendations_status": "pending",
@@ -420,14 +421,14 @@ def test_a5_submit_failure_finishes_pending_state_without_blocking_review(
         return manifest
 
     with (
-        patch("palantum.web.app.analyze"),
+        patch("pitchcraft.web.app.analyze"),
         patch(
-            "palantum.web.app.load",
+            "pitchcraft.web.app.load",
             return_value={"meta": {"sources": [str(source)]}},
         ),
-        patch("palantum.web.app.build_chunk_variants", side_effect=build),
+        patch("pitchcraft.web.app.build_chunk_variants", side_effect=build),
         patch(
-            "palantum.web.app._RECOMMENDATION_EXECUTOR.submit",
+            "pitchcraft.web.app._RECOMMENDATION_EXECUTOR.submit",
             side_effect=RuntimeError("executor unavailable"),
         ),
     ):
@@ -488,7 +489,7 @@ def test_frontend_defers_job_ui_until_video_processing_is_running(tmp_path: Path
 
     assert "showJobStatus" not in canvas_activity
     assert "$('progress').hidden = false" not in upload_start
-    assert "title: 'Videoauftrag gestartet'" not in upload_start
+    assert "title: 'Video job started'" not in upload_start
     assert "if (!['running', 'finalizing'].includes(reportedStatus))" in html
     assert "const jobStarted = ['running', 'finalizing'].includes" in html
 
@@ -511,7 +512,7 @@ def test_state_payload_exposes_two_variants_per_chunk_for_review(tmp_path: Path)
                         "recommendation": {
                             "status": "ready",
                             "variant_id": "b",
-                            "reason": "Die Motion-Fassung erklärt den Beat.",
+                            "reason": "The motion version explains the beat.",
                         },
                         "variants": [
                             {"id": "a", "label": "Version A", "name": "Clean Cut"},
@@ -536,7 +537,7 @@ def test_state_uses_one_coherent_chunk_manifest_snapshot(tmp_path: Path) -> None
     edit = tmp_path / "edit"
     edit.mkdir()
     (edit / "job.json").write_text(json.dumps({"status": "review"}), encoding="utf-8")
-    pending = {
+    pending: dict[str, Any] = {
         "generation_id": "one",
         "recommendations_status": "pending",
         "chunks": [
@@ -559,7 +560,7 @@ def test_state_uses_one_coherent_chunk_manifest_snapshot(tmp_path: Path) -> None
     }
 
     with patch(
-        "palantum.web.app._read_chunks", side_effect=[pending, completed]
+        "pitchcraft.web.app._read_chunks", side_effect=[pending, completed]
     ) as read_chunks:
         result = state_payload(tmp_path)
 
@@ -647,7 +648,7 @@ def test_activity_endpoint_reports_agents_without_reading_render_manifest(
     )
     client = TestClient(create_app(tmp_path))
 
-    with patch("palantum.web.app._read_chunks", side_effect=AssertionError):
+    with patch("pitchcraft.web.app._read_chunks", side_effect=AssertionError):
         response = client.get("/api/activity")
 
     assert response.status_code == 200
@@ -701,7 +702,7 @@ def test_finalize_requires_complete_selection_and_starts_background_job(
 ) -> None:
     edit = tmp_path / "edit"
     edit.mkdir()
-    manifest = {
+    manifest: dict[str, Any] = {
         "chunks": [
             {"id": "one", "selected": "a", "variants": [{"id": "a"}]},
             {"id": "two", "selected": None, "variants": [{"id": "a"}]},
@@ -713,7 +714,7 @@ def test_finalize_requires_complete_selection_and_starts_background_job(
     assert client.post("/api/finalize").status_code == 409
     manifest["chunks"][1]["selected"] = "a"
     (edit / "chunks.json").write_text(json.dumps(manifest), encoding="utf-8")
-    with patch("palantum.web.app._EXECUTOR.submit") as submit:
+    with patch("pitchcraft.web.app._EXECUTOR.submit") as submit:
         response = client.post("/api/finalize")
 
     assert response.status_code == 202
@@ -806,7 +807,7 @@ def test_selection_cannot_make_a_finished_master_stale(tmp_path: Path) -> None:
 
 
 def test_frontend_serves_corner_logo(tmp_path: Path) -> None:
-    response = TestClient(create_app(tmp_path)).get("/palantum-logo.png")
+    response = TestClient(create_app(tmp_path)).get("/pitchcraft-logo.png")
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
@@ -818,7 +819,7 @@ def test_whisper_call_is_offloaded_from_async_request_loop(tmp_path: Path) -> No
 
     with (
         patch.dict("os.environ", {"OPENAI_API_KEY": "whisper-test-key"}),
-        patch("palantum.web.app.run_in_threadpool", worker),
+        patch("pitchcraft.web.app.run_in_threadpool", worker),
     ):
         response = client.post(
             "/api/transcribe",
@@ -827,6 +828,7 @@ def test_whisper_call_is_offloaded_from_async_request_loop(tmp_path: Path) -> No
 
     assert response.status_code == 200
     assert response.json() == {"text": "Transkribierter Text"}
+    assert worker.await_args is not None
     function, _temporary, api_key = worker.await_args.args
     assert function is _transcribe_with_whisper
     assert api_key == "whisper-test-key"

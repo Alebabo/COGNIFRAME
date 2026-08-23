@@ -1,0 +1,2689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="pitchcraft-logo.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pitchcraft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #111214;
+    --muted: #82858b;
+    --border: #e8e8e8;
+    --soft: #f8f9fa;
+    --director: #8b5cf6;
+    --strategist: #f59e0b;
+    --supervisor: #3b82f6;
+    --ghost: #9ca3af;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: #ffffff;
+    color: var(--ink);
+    font-family: Inter, -apple-system, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  /* Top Navigation Bar */
+  .topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    background: rgba(255,255,255,0.94);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    z-index: 100;
+  }
+  .brand {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    user-select: none;
+  }
+  .brand-dot { color: #111214; }
+
+  /* Overlapping Agent Avatars */
+  .agents-nav {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .avatar-stack {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 24px;
+    transition: background 150ms ease;
+  }
+  .avatar-stack:hover { background: var(--soft); }
+  .agent-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+    margin-left: -8px;
+    transition: transform 180ms ease, z-index 180ms ease, box-shadow 180ms ease;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    user-select: none;
+    position: relative;
+  }
+  .agent-avatar:first-child { margin-left: 0; }
+  .agent-avatar.director { background: var(--director); z-index: 3; }
+  .agent-avatar.strategist { background: var(--strategist); z-index: 2; }
+  .agent-avatar.supervisor { background: var(--supervisor); z-index: 1; }
+  .avatar-stack:hover .agent-avatar {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  }
+
+  /* Agents Dropdown / Tooltip */
+  .agents-tooltip {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 280px;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.08);
+    padding: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-6px);
+    transition: opacity 160ms ease, transform 160ms ease;
+    z-index: 120;
+  }
+  .agents-nav:hover .agents-tooltip,
+  .agents-tooltip:hover {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+  .agents-tooltip-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .agent-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .agent-row:last-child { margin-bottom: 0; }
+  .agent-row-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+  .agent-row-info { flex: 1; }
+  .agent-row-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .agent-row-status {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--muted);
+  }
+  .agent-row-role {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 1px;
+    line-height: 1.35;
+  }
+
+  /* Main Writing Surface / Canvas */
+  main {
+    width: min(100% - 48px, 800px);
+    margin: 0 auto;
+    padding-top: 120px;
+    padding-bottom: 160px;
+  }
+
+  .canvas-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  /* Dual Layer: Real Textarea + Flowing Dynamic Display Layer */
+  .prompt, .canvas-display, #mirror {
+    font-family: Inter, -apple-system, system-ui, sans-serif;
+    font-size: 24px;
+    line-height: 1.6;
+    letter-spacing: -0.015em;
+    padding: 0;
+    margin: 0;
+    border: none;
+    width: 100%;
+    box-sizing: border-box;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .prompt {
+    position: relative;
+    min-height: 240px;
+    background: transparent;
+    color: var(--ink);
+    caret-color: var(--ink);
+    resize: none;
+    outline: none;
+    z-index: 2;
+  }
+  .prompt.has-ghost {
+    color: transparent !important;
+  }
+  .prompt::placeholder {
+    color: #c4c6cb;
+    font-weight: 400;
+  }
+
+  .canvas-display {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    min-height: 240px;
+    pointer-events: none;
+    color: var(--ink);
+    z-index: 1;
+    user-select: none;
+    display: none;
+  }
+  .canvas-display.visible {
+    display: block;
+  }
+  .ghost-text-grey {
+    color: #9ca3af; /* True subtle grey autocomplete text */
+    opacity: 0.95;
+    font-style: normal;
+  }
+
+  /* Collaborative Dynamic Cursors Layer */
+  .cursors-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+    z-index: 50;
+  }
+  .agent-cursor {
+    position: absolute;
+    display: inline-block;
+    transition: transform 550ms cubic-bezier(0.16, 1, 0.3, 1), opacity 300ms ease;
+    opacity: 0.95;
+    pointer-events: none;
+    z-index: 50;
+    top: 0;
+    left: 0;
+    transform: translate(0, 0);
+  }
+  .agent-cursor.visible {
+    opacity: 1;
+    pointer-events: auto !important;
+  }
+  .agent-cursor:hover,
+  .agent-cursor:has(:hover) {
+    z-index: 9999 !important;
+  }
+  .cursor-header-wrap {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    pointer-events: auto !important;
+    z-index: 60;
+  }
+  .cursor-header-wrap:hover {
+    z-index: 9999 !important;
+  }
+  .cursor-header {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: 0.02em;
+    user-select: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    white-space: nowrap;
+  }
+  .cursor-caret {
+    width: 2px;
+    height: 32px;
+    border-radius: 1px;
+    animation: caretBlink 1.2s ease-in-out infinite;
+  }
+  @keyframes caretBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
+
+  /* Modern (i) Info Circle Badge with crisp sans-serif Inter typography */
+  .cursor-info-badge {
+    position: relative;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1.5px solid currentColor;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: Inter, -apple-system, sans-serif;
+    font-style: normal;
+    line-height: 1;
+    cursor: pointer !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    pointer-events: auto !important;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+    animation: popIn 180ms ease both;
+  }
+  .cursor-info-badge:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+    z-index: 9999 !important;
+  }
+
+  /* Agent Cursor Colors */
+  .agent-cursor.director .cursor-header { background: var(--director); }
+  .agent-cursor.director .cursor-caret { background: var(--director); }
+  .agent-cursor.director .cursor-info-badge { color: var(--director); }
+
+  .agent-cursor.strategist .cursor-header { background: var(--strategist); }
+  .agent-cursor.strategist .cursor-caret { background: var(--strategist); }
+  .agent-cursor.strategist .cursor-info-badge { color: var(--strategist); }
+
+  .agent-cursor.supervisor .cursor-header { background: var(--supervisor); }
+  .agent-cursor.supervisor .cursor-caret { background: var(--supervisor); }
+  .agent-cursor.supervisor .cursor-info-badge { color: var(--supervisor); }
+
+  /* Floating Advice Box: Dominant solid opaque white, auto-resizing with high elevation */
+  .floating-advice {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #ffffff !important;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.18), 0 3px 8px rgba(0,0,0,0.06);
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: #374151;
+    min-width: 220px;
+    max-width: 380px;
+    width: max-content;
+    height: auto;
+    box-sizing: border-box;
+    pointer-events: auto !important;
+    cursor: default;
+    z-index: 9999 !important;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: opacity 160ms ease, transform 160ms ease, visibility 160ms ease;
+    user-select: none;
+    font-family: Inter, sans-serif;
+    font-style: normal;
+  }
+  .cursor-info-badge:hover .floating-advice,
+  .floating-advice:hover {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    z-index: 9999 !important;
+  }
+
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.85); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .advice-text {
+    flex: 1;
+    font-size: 12.5px;
+    color: #374151;
+    font-weight: 400;
+    line-height: 1.45;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    pointer-events: auto !important;
+  }
+  .advice-close {
+    border: none;
+    background: transparent;
+    color: #9ca3af;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer !important;
+    padding: 2px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    pointer-events: auto !important;
+    transition: color 150ms ease, background 150ms ease;
+  }
+  .advice-close:hover {
+    color: var(--ink);
+    background: #f3f4f6;
+  }
+
+  /* Offscreen Mirror for coordinate calculation */
+  #mirror {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+    visibility: hidden;
+  }
+
+  .attachment-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 24px;
+  }
+  .attachment {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--soft);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .attachment button {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--muted);
+    padding: 0;
+  }
+  .attachment button:hover { color: var(--ink); }
+
+  .error {
+    margin-top: 24px;
+    padding: 12px 16px;
+    background: #fff5f5;
+    border: 1px solid #fed7d7;
+    border-radius: 4px;
+    color: #c53030;
+    font-size: 13px;
+  }
+
+  /* Generated Script Area */
+  .result {
+    margin-top: 48px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+  .result-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .source {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .script {
+    width: 100%;
+    min-height: 280px;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--ink);
+    resize: vertical;
+    padding: 0;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  /* Progress & Final Video */
+  .progress {
+    margin-top: 48px;
+    padding: 32px 0;
+    text-align: center;
+  }
+  .progress-line {
+    height: 2px;
+    width: 100%;
+    background: var(--border);
+    position: relative;
+    overflow: hidden;
+    border-radius: 1px;
+    margin-bottom: 16px;
+  }
+  .progress-line::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: var(--progress-value, 8%);
+    background: var(--ink);
+    transition: width 320ms ease;
+  }
+  .progress-copy {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* Persistent status surface for long-running jobs and contextual guidance. */
+  .notification-stack {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    width: min(360px, calc(100vw - 32px));
+    display: grid;
+    gap: 10px;
+    z-index: 130;
+    pointer-events: none;
+  }
+  .job-status-card,
+  .context-hint-card {
+    padding: 18px;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 18px 48px rgba(17, 18, 20, 0.14);
+    pointer-events: auto;
+  }
+  .job-status-card[hidden],
+  .context-hint-card[hidden] { display: none; }
+  .job-status-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+  }
+  .job-status-indicator {
+    width: 10px;
+    height: 10px;
+    margin-top: 5px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: #d89b24;
+    box-shadow: 0 0 0 4px #fff5d8;
+  }
+  .job-status-card[data-tone="active"] .job-status-indicator {
+    background: #2563eb;
+    box-shadow: 0 0 0 4px #e5edff;
+  }
+  .job-status-card[data-tone="success"] .job-status-indicator {
+    background: #16824b;
+    box-shadow: 0 0 0 4px #def5e8;
+  }
+  .job-status-card[data-tone="error"] .job-status-indicator {
+    background: #c93838;
+    box-shadow: 0 0 0 4px #fde7e7;
+  }
+  .job-status-body { min-width: 0; flex: 1; }
+  .job-status-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .job-status-detail {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .job-status-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 16px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .job-status-meta strong { color: var(--ink); font-weight: 600; }
+  .job-status-progress {
+    height: 4px;
+    margin-top: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #eceef1;
+  }
+  .job-status-progress span {
+    display: block;
+    width: var(--job-progress, 8%);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--ink);
+    transition: width 320ms ease;
+  }
+  .job-agent-activity {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 13px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    color: var(--ink);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .job-agent-activity[hidden] { display: none; }
+  .job-agent-activity-dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #2563eb;
+    box-shadow: 0 0 0 3px #e5edff;
+  }
+  .job-agent-activity[data-live="true"] .job-agent-activity-dot,
+  .job-agent-activity[data-live="true"] .job-agent-activity-copy {
+    animation: agent-live-blink 1.1s ease-in-out infinite;
+  }
+  @keyframes agent-live-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  .context-hint-card {
+    border-left: 3px solid #d89b24;
+  }
+  .context-hint-card[data-kind="suggestion"] { border-left-color: #2563eb; }
+  .context-hint-kicker {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .context-hint-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .context-hint-detail {
+    display: -webkit-box;
+    margin: 5px 0 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .job-agent-activity[data-live="true"] .job-agent-activity-dot,
+    .job-agent-activity[data-live="true"] .job-agent-activity-copy {
+      animation: none;
+    }
+  }
+  .beats {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .beat {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .beat[data-status="covered"] {
+    background: var(--ink);
+    color: #ffffff;
+    border-color: var(--ink);
+  }
+
+  .agent-status-message {
+    margin-top: 16px;
+    padding: 10px 12px;
+    border: 1px solid #f3dfb0;
+    border-radius: 6px;
+    background: #fffbeb;
+    color: #7c5b12;
+    font-size: 12px;
+  }
+
+  /* Chunk A/B review remains part of the writing workspace. */
+  .chunk-review {
+    margin-top: 52px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+  .review-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  .review-heading h2 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    line-height: 1.25;
+    letter-spacing: -0.025em;
+  }
+  .review-heading p,
+  .selection-status {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .review-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .secondary {
+    min-height: 38px;
+    padding: 0 15px;
+    border: 1px solid var(--border);
+    border-radius: 19px;
+    background: #ffffff;
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .secondary:hover:not(:disabled) { border-color: var(--ink); }
+  .secondary:disabled { opacity: 0.42; cursor: not-allowed; }
+  .chunk-list { display: grid; gap: 36px; }
+  .chunk {
+    min-width: 0;
+    padding-bottom: 36px;
+    border-bottom: 1px solid var(--border);
+  }
+  .chunk:last-child { padding-bottom: 0; border-bottom: 0; }
+  .chunk-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 14px;
+  }
+  .chunk-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .chunk-order {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .recommendation {
+    max-width: 55%;
+    padding: 7px 10px;
+    border: 1px solid #dbeafe;
+    border-radius: 6px;
+    background: #eff6ff;
+    color: #1e4c8f;
+    font-size: 11px;
+    line-height: 1.4;
+    text-align: right;
+  }
+  .recommendation[data-status="failed"],
+  .recommendation[data-status="error"] {
+    border-color: var(--border);
+    background: var(--soft);
+    color: var(--muted);
+  }
+  .recommendation-badge {
+    display: block;
+    margin-bottom: 2px;
+    font-weight: 600;
+  }
+  .variant-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .variant {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #ffffff;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .variant[data-recommended="true"] { border-color: #93c5fd; }
+  .variant[data-selected="true"] {
+    border-color: var(--ink);
+    box-shadow: 0 0 0 1px var(--ink);
+  }
+  .variant video {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: none;
+    object-fit: contain;
+    background: #090909;
+  }
+  .variant video.unavailable { opacity: 0.35; }
+  .variant-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 70px;
+    padding: 11px 12px;
+  }
+  .variant-copy { min-width: 0; }
+  .variant-name,
+  .variant-strategy { display: block; }
+  .variant-name { font-size: 12px; font-weight: 600; }
+  .variant-strategy {
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .variant-select {
+    flex-shrink: 0;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: #ffffff;
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .variant[data-selected="true"] .variant-select {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: #ffffff;
+  }
+  .variant-select:disabled { opacity: 0.42; cursor: not-allowed; }
+  .review-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-top: 28px;
+  }
+
+  .output {
+    margin-top: 48px;
+  }
+  .video-wrap {
+    width: 100%;
+    background: #000;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  video {
+    display: block;
+    width: 100%;
+    max-height: 60vh;
+  }
+  .output-title {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 4px;
+  }
+  .output-subtitle {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0 0 24px;
+  }
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    text-decoration: none;
+    background: #ffffff;
+    cursor: pointer;
+    transition: border-color 150ms ease, background 150ms ease;
+  }
+  .action:hover { border-color: var(--ink); }
+  .reset {
+    display: inline-block;
+    margin-top: 24px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .reset:hover { color: var(--ink); }
+
+  /* Minimal Reverted Bottom Toolbar */
+  .toolbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 72px;
+    background: #ffffff;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 32px;
+    z-index: 100;
+  }
+  .toolbar-inner {
+    width: min(100% - 48px, 800px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .icon-button {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 150ms ease, border-color 150ms ease;
+  }
+  .icon-button:hover { background: var(--soft); }
+  .icon-button.listening {
+    background: #fee2e2;
+    color: #dc2626;
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse { 50% { opacity: 0.6; } }
+
+  .primary {
+    height: 40px;
+    padding: 0 20px;
+    border-radius: 20px;
+    border: none;
+    background: var(--ink);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 150ms ease, transform 150ms ease;
+  }
+  .primary:hover:not(:disabled) { opacity: 0.9; }
+  .primary:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .corner-logo {
+    position: fixed;
+    z-index: 12;
+    right: 16px;
+    bottom: 16px;
+    width: 144px;
+    height: auto;
+    opacity: 0.75;
+    pointer-events: none;
+  }
+
+  @media (max-width: 680px) {
+    .topbar { padding: 0 16px; }
+    main { width: calc(100% - 32px); padding-top: 96px; }
+    .notification-stack { top: 72px; right: 16px; }
+    .prompt, .canvas-display, #mirror { font-size: 20px; }
+    .toolbar { padding: 0 16px; }
+    .actions { grid-template-columns: repeat(2, 1fr); }
+    .review-heading,
+    .review-footer { align-items: stretch; flex-direction: column; }
+    .review-actions { align-items: stretch; flex-direction: column; }
+    .variant-grid { grid-template-columns: 1fr; }
+    .recommendation { max-width: 100%; text-align: left; }
+    .chunk-head { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Pitchcraft<span class="brand-dot">.</span></div>
+  <div class="agents-nav">
+    <div class="avatar-stack" id="avatar-stack" aria-label="Director, Strategist, and Supervisor">
+      <div class="agent-avatar director" data-agent-id="A2" role="button" tabindex="0" aria-label="Ask Director for advice">A2</div>
+      <div class="agent-avatar strategist" data-agent-id="A3" role="button" tabindex="0" aria-label="Ask Strategist for advice">A3</div>
+      <div class="agent-avatar supervisor" data-agent-id="A1" role="button" tabindex="0" aria-label="Ask Supervisor for advice">A1</div>
+    </div>
+    <div class="agents-tooltip" id="agents-tooltip">
+      <div class="agents-tooltip-title">AI agent trio</div>
+      <div class="agent-row">
+        <div class="agent-row-dot" style="background: var(--director);"></div>
+        <div class="agent-row-info">
+          <div class="agent-row-name">A2 Director <span class="agent-row-status" id="status-director">ready</span></div>
+          <div class="agent-row-role">Direction, hook, pacing, and video structure</div>
+        </div>
+      </div>
+      <div class="agent-row">
+        <div class="agent-row-dot" style="background: var(--strategist);"></div>
+        <div class="agent-row-info">
+          <div class="agent-row-name">A3 Strategist <span class="agent-row-status" id="status-strategist">ready</span></div>
+          <div class="agent-row-role">Pitch story, hard metrics, and value arguments</div>
+        </div>
+      </div>
+      <div class="agent-row">
+        <div class="agent-row-dot" style="background: var(--supervisor);"></div>
+        <div class="agent-row-info">
+          <div class="agent-row-name">A1 Supervisor <span class="agent-row-status" id="status-supervisor">ready</span></div>
+          <div class="agent-row-role">Script structure, word boundaries, and beat mapping</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="notification-stack" aria-label="Status and notifications">
+  <aside id="job-status-card" class="job-status-card" data-tone="active" role="status" aria-live="polite" hidden>
+    <div class="job-status-head">
+      <span class="job-status-indicator" aria-hidden="true"></span>
+      <div class="job-status-body">
+        <h2 id="job-status-title" class="job-status-title">Video job started</h2>
+        <p id="job-status-detail" class="job-status-detail">The job is being prepared.</p>
+      </div>
+    </div>
+    <div class="job-status-meta">
+      <span>Estimated time remaining</span>
+      <strong id="job-status-eta">approx. 6–10 min</strong>
+    </div>
+    <div id="job-status-progress" class="job-status-progress" role="progressbar" aria-label="Video creation progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8">
+      <span></span>
+    </div>
+    <div id="job-agent-activity" class="job-agent-activity" data-live="false" hidden>
+      <span class="job-agent-activity-dot" aria-hidden="true"></span>
+      <span id="job-agent-activity-copy" class="job-agent-activity-copy"></span>
+    </div>
+  </aside>
+  <aside id="context-hint-card" class="context-hint-card" data-kind="context" role="status" aria-live="polite" hidden>
+    <span id="context-hint-kicker" class="context-hint-kicker">Context hint</span>
+    <h2 id="context-hint-title" class="context-hint-title">More context needed</h2>
+    <p id="context-hint-detail" class="context-hint-detail"></p>
+  </aside>
+</div>
+
+<main>
+  <div class="canvas-wrapper">
+    <!-- Flowing Display Layer: Renders real text before + grey ghost text + real text after (natively shifted) -->
+    <div id="canvas-display" class="canvas-display" aria-hidden="true"></div>
+
+    <!-- Active Textarea -->
+    <textarea id="prompt" class="prompt" aria-label="Describe your video" placeholder="What do you want to tell? Write freely..."></textarea>
+
+    <!-- Collaborative Dynamic Cursors & Floating Advice Layer -->
+    <div class="cursors-layer" id="cursors-layer">
+      <!-- Director Cursor & (i) Info Badge -->
+      <div id="cursor-director" class="agent-cursor director visible">
+        <div class="cursor-header-wrap">
+          <div class="cursor-header">A2 · Director</div>
+          <div id="info-badge-director" class="cursor-info-badge" style="display:none;">
+            <span>i</span>
+            <div id="advice-director" class="floating-advice">
+              <span class="advice-text" id="advice-text-director"></span>
+              <button type="button" class="advice-close" onmousedown="dismissAdvice(event, 'director')" onclick="dismissAdvice(event, 'director')">×</button>
+            </div>
+          </div>
+        </div>
+        <div class="cursor-caret"></div>
+      </div>
+
+      <!-- Strategist Cursor & (i) Info Badge -->
+      <div id="cursor-strategist" class="agent-cursor strategist visible">
+        <div class="cursor-header-wrap">
+          <div class="cursor-header">A3 · Strategist</div>
+          <div id="info-badge-strategist" class="cursor-info-badge" style="display:none;">
+            <span>i</span>
+            <div id="advice-strategist" class="floating-advice">
+              <span class="advice-text" id="advice-text-strategist"></span>
+              <button type="button" class="advice-close" onmousedown="dismissAdvice(event, 'strategist')" onclick="dismissAdvice(event, 'strategist')">×</button>
+            </div>
+          </div>
+        </div>
+        <div class="cursor-caret"></div>
+      </div>
+
+      <!-- Supervisor Cursor & (i) Info Badge -->
+      <div id="cursor-supervisor" class="agent-cursor supervisor visible">
+        <div class="cursor-header-wrap">
+          <div class="cursor-header">A1 · Supervisor</div>
+          <div id="info-badge-supervisor" class="cursor-info-badge" style="display:none;">
+            <span>i</span>
+            <div id="advice-supervisor" class="floating-advice">
+              <span class="advice-text" id="advice-text-supervisor"></span>
+              <button type="button" class="advice-close" onmousedown="dismissAdvice(event, 'supervisor')" onclick="dismissAdvice(event, 'supervisor')">×</button>
+            </div>
+          </div>
+        </div>
+        <div class="cursor-caret"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="attachments" class="attachment-list" aria-live="polite"></div>
+  <div id="compose-error" class="error" role="alert" hidden></div>
+  <div id="agent-status-message" class="agent-status-message" role="status" hidden>
+    AI agents are currently unavailable. You can still use the canvas and select variants manually.
+  </div>
+
+  <!-- The A/B review intentionally stays below the live canvas so context remains visible on reload. -->
+  <section id="chunk-review" class="chunk-review" aria-labelledby="chunk-review-title" hidden>
+    <div class="review-heading">
+      <div>
+        <h2 id="chunk-review-title">Review edit variants</h2>
+        <p>Compare Clean Cut and Motion Cut for each section.</p>
+      </div>
+      <div class="review-actions">
+        <button id="apply-recommendations" class="secondary" type="button" disabled>Apply all AI recommendations</button>
+      </div>
+    </div>
+    <div id="chunk-list" class="chunk-list"></div>
+    <div class="review-footer">
+      <p id="selection-status" class="selection-status">No variants selected yet.</p>
+      <button id="finalize" class="primary" type="button" disabled>Render selection</button>
+    </div>
+  </section>
+
+  <!-- Generated Script Result Section -->
+  <section id="script-result" class="result" hidden>
+    <div class="result-head">
+      <span class="eyebrow">Script</span>
+      <span id="generator-source" class="source"></span>
+    </div>
+    <textarea id="script-output" class="script" aria-label="Generiertes Script"></textarea>
+    <div class="hint">You can refine the text directly or add takes.</div>
+  </section>
+
+  <!-- Progress Section -->
+  <section id="progress" class="progress" aria-live="polite" hidden>
+    <div id="progress-line" class="progress-line" role="progressbar" aria-label="Video processing progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8"></div>
+    <div id="progress-copy" class="progress-copy">Analyzing footage …</div>
+    <div id="beats" class="beats"></div>
+  </section>
+
+  <!-- Final Render / NLE Export Section -->
+  <section id="output" class="output" hidden>
+    <div class="video-wrap">
+      <video id="player" controls playsinline></video>
+    </div>
+    <h2 class="output-title">Your video has been edited.</h2>
+    <p class="output-subtitle">Export the rendered video or open the project in your NLE.</p>
+    <div class="actions">
+      <a class="action" id="export-video" download><span>Video MP4</span></a>
+      <a class="action" id="export-fcpxml" download><span>Final Cut Pro</span></a>
+      <a class="action" id="export-davinci" download><span>DaVinci XML</span></a>
+      <a class="action" id="export-folder" download><span>Project folder</span></a>
+    </div>
+    <button id="reset" class="reset" type="button">New project</button>
+  </section>
+</main>
+
+<div id="mirror"></div>
+<img class="corner-logo" src="pitchcraft-logo.png" alt="Pitchcraft">
+
+<!-- Minimal Reverted Bottom Toolbar -->
+<footer id="toolbar" class="toolbar">
+  <div class="toolbar-inner">
+    <div class="tools">
+      <button id="upload" class="icon-button" type="button" aria-label="Upload file" title="Attach video or note">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button id="mic" class="icon-button" type="button" aria-label="Dictate details" title="Dictate details">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/></svg>
+      </button>
+    </div>
+    <div class="actions-right">
+      <button id="generate" class="primary" type="button" disabled>Generate</button>
+      <button id="create-video" class="primary" type="button" hidden>Create video</button>
+    </div>
+  </div>
+</footer>
+
+<input type="file" id="picker" accept="video/*,audio/*,.txt,.md,.pdf" multiple hidden>
+
+<script>
+const $ = id => document.getElementById(id);
+const MOCK = new URLSearchParams(location.search).get('mock');
+const state = {
+  files: [],
+  chunks: [],
+  generating: false,
+  uploading: false,
+  pollingRecommendations: false,
+  finalizing: false,
+  applyingRecommendations: false,
+  recommendationsStatus: 'complete',
+  recognition: null,
+  typingTimeout: null,
+  orchestrateDebounce: null,
+  canvasSaveTimeout: null,
+  dismissed: {},
+  activeGhostText: '',
+  activeRecommendations: [],
+  inflight: false,
+  acceptedGhostTexts: new Set(),
+  canvas: { title: 'My Startup Pitch', text: '', beats: {}, attached_videos: {} },
+  canvasHydrated: false,
+  hydratingCanvas: false,
+  textRevision: 0,
+  saveRevision: 0,
+  orchestrationSequence: 0,
+  assistSequences: { A1: 0, A2: 0, A3: 0 },
+  orchestrationController: null,
+  assistControllers: { A1: null, A2: null, A3: null },
+  seenRequestIds: new Set(),
+  lastAppliedRequestId: null,
+  agentsAvailable: null,
+  jobStatusTimeout: null,
+  jobActivityPollTimer: null,
+  jobActivityPolling: false,
+  activeCanvasAgents: new Map(),
+};
+
+const AGENT_META = {
+  A1: { key: 'supervisor', role: 'Supervisor', beat: 'ASK' },
+  A2: { key: 'director', role: 'Director', beat: 'HOOK' },
+  A3: { key: 'strategist', role: 'Strategist', beat: 'TRACTION' },
+};
+
+// HTML escape helper
+function escapeHtml(str) {
+  return (str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function normalizeText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function setProgressValue(value) {
+  const progress = Math.max(0, Math.min(100, Number(value) || 0));
+  const line = $('progress-line');
+  const popupProgress = $('job-status-progress');
+  line.style.setProperty('--progress-value', `${progress}%`);
+  line.setAttribute('aria-valuenow', String(progress));
+  popupProgress.style.setProperty('--job-progress', `${progress}%`);
+  popupProgress.setAttribute('aria-valuenow', String(progress));
+}
+
+function showJobStatus({ tone = 'active', title, detail, eta, progress, autoHide = 0 }) {
+  clearTimeout(state.jobStatusTimeout);
+  state.jobStatusTimeout = null;
+  const card = $('job-status-card');
+  card.dataset.tone = tone;
+  $('job-status-title').textContent = title;
+  $('job-status-detail').textContent = detail;
+  $('job-status-eta').textContent = eta;
+  setProgressValue(progress);
+  card.hidden = false;
+  if (autoHide) {
+    state.jobStatusTimeout = setTimeout(() => {
+      card.hidden = true;
+      state.jobStatusTimeout = null;
+    }, autoHide);
+  }
+}
+
+function hideJobStatus() {
+  clearTimeout(state.jobStatusTimeout);
+  state.jobStatusTimeout = null;
+  $('job-status-card').hidden = true;
+}
+
+function agentActivityCopy(role) {
+  const normalized = String(role || '').toLowerCase();
+  if (normalized.includes('script supervisor')) return 'A1 Script Supervisor started script review.';
+  if (normalized.includes('variant supervisor')) return 'A5 Variant Supervisor is evaluating the edit variants.';
+  if (normalized.includes('graphics director')) return 'A6 Graphics Director is planning the motion graphics.';
+  if (normalized.includes('graphics worker')) return 'A6 Graphics Worker is rendering a motion graphic.';
+  if (normalized.includes('director')) return 'A2 Director started video analysis.';
+  if (normalized.includes('strateg')) return 'A3 Strategist is reviewing value and claims.';
+  if (normalized.includes('cutter')) return 'A4 Cutter is rendering the edit variants.';
+  if (normalized === 'qc' || normalized.includes('quality')) return 'A7 Quality Control is reviewing the result.';
+  return role ? `${role} started a work step.` : '';
+}
+
+function showAgentActivity(copy) {
+  const activity = $('job-agent-activity');
+  if (!copy) {
+    activity.hidden = true;
+    activity.dataset.live = 'false';
+    $('job-agent-activity-copy').textContent = '';
+    return;
+  }
+  $('job-agent-activity-copy').textContent = copy;
+  activity.dataset.live = 'true';
+  activity.hidden = false;
+}
+
+function renderAgentActivity(sessions = []) {
+  const running = (Array.isArray(sessions) ? sessions : [])
+    .find(item => String(item?.status || '').toLowerCase() === 'running');
+  if (running) {
+    showAgentActivity(agentActivityCopy(running.role));
+    return;
+  }
+  const canvasActivity = [...state.activeCanvasAgents.values()].at(-1);
+  showAgentActivity(canvasActivity || '');
+}
+
+function beginCanvasAgentActivity(requestId, copy) {
+  state.activeCanvasAgents.set(requestId, copy);
+  renderAgentActivity();
+}
+
+function endCanvasAgentActivity(requestId) {
+  state.activeCanvasAgents.delete(requestId);
+  renderAgentActivity();
+}
+
+function showContextHint({ kind = 'context', kicker, title, detail }) {
+  const card = $('context-hint-card');
+  card.dataset.kind = kind;
+  $('context-hint-kicker').textContent = kicker;
+  $('context-hint-title').textContent = title;
+  $('context-hint-detail').textContent = detail;
+  card.hidden = false;
+}
+
+function updateContextHint() {
+  const recommendation = state.activeRecommendations.find(item => {
+    const key = AGENT_META[item.agent]?.key;
+    return !key || !state.dismissed[key];
+  });
+  if (recommendation) {
+    const role = recommendation.role || AGENT_META[recommendation.agent]?.role || 'Agent';
+    showContextHint({
+      kind: 'suggestion',
+      kicker: `${recommendation.agent} · ${role}`,
+      title: 'Improvement suggestion',
+      detail: recommendation.message || recommendation.ghost_text,
+    });
+    return;
+  }
+  const text = $('prompt').value.trim();
+  if (text.length > 0 && text.length < 12) {
+    showContextHint({
+      kind: 'context',
+      kicker: 'Context hint',
+      title: 'More context needed',
+      detail: 'Add the target audience, problem, or desired outcome so the agents can get started effectively.',
+    });
+    return;
+  }
+  $('context-hint-card').hidden = true;
+}
+
+async function pollJobActivity() {
+  if (MOCK) return;
+  state.jobActivityPolling = true;
+  try {
+    const response = await fetch('/api/activity');
+    if (response.ok) {
+      const data = await response.json();
+      renderAgentActivity(data.sessions || []);
+    }
+  } catch (_) {}
+  const keepPolling = state.uploading || state.pollingRecommendations || state.finalizing;
+  if (keepPolling) {
+    state.jobActivityPollTimer = setTimeout(pollJobActivity, 1200);
+  } else {
+    state.jobActivityPollTimer = null;
+    state.jobActivityPolling = false;
+  }
+}
+
+function startJobActivityPolling() {
+  if (MOCK || state.jobActivityPolling || state.jobActivityPollTimer) return;
+  pollJobActivity();
+}
+
+function stopJobActivityPolling() {
+  clearTimeout(state.jobActivityPollTimer);
+  state.jobActivityPollTimer = null;
+  state.jobActivityPolling = false;
+  renderAgentActivity();
+}
+
+function renderJobStatus(data) {
+  const phase = String(data.phase || 'empty').toLowerCase();
+  const reportedStatus = String(data.job_status || '').toLowerCase();
+  renderAgentActivity(data.sessions || []);
+
+  if (phase === 'error') {
+    showJobStatus({
+      tone: 'error',
+      title: 'Video creation failed',
+      detail: 'The job was stopped. The exact cause is shown in the workspace.',
+      eta: 'Stopped',
+      progress: 100,
+    });
+    return;
+  }
+
+  if (phase === 'working') {
+    if (!['running', 'finalizing'].includes(reportedStatus)) {
+      hideJobStatus();
+      setProgressValue(0);
+      return;
+    }
+    const status = reportedStatus;
+    const presentation = {
+      running: {
+        tone: 'active',
+        title: 'Creating video',
+        detail: 'Footage is analyzed, edited, and rendered as variants.',
+        eta: 'approx. 4–8 min',
+        progress: 58,
+      },
+      finalizing: {
+        tone: 'active',
+        title: 'Rendering final video',
+        detail: 'The selected variants are assembled into one video.',
+        eta: 'approx. 1–3 min',
+        progress: 88,
+      },
+    }[status];
+    showJobStatus(presentation);
+    return;
+  }
+
+  if (phase === 'review') {
+    if (data.recommendations_status === 'pending') {
+      showJobStatus({
+        tone: 'active',
+        title: 'Variants rendered',
+        detail: 'AI recommendations for the selection are still being reviewed.',
+        eta: 'approx. 1–2 min',
+        progress: 94,
+      });
+    } else {
+      showJobStatus({
+        tone: 'success',
+        title: 'Variants are ready',
+        detail: 'You can now compare and select the edit variants.',
+        eta: 'Complete',
+        progress: 100,
+        autoHide: 7000,
+      });
+    }
+    return;
+  }
+
+  if (phase === 'done' && data.video_url) {
+    showJobStatus({
+      tone: 'success',
+      title: 'Video is ready',
+      detail: 'The final video can now be viewed or exported.',
+      eta: 'Complete',
+      progress: 100,
+      autoHide: 10000,
+    });
+    return;
+  }
+
+  hideJobStatus();
+  setProgressValue(0);
+}
+
+function clientRequestId(prefix) {
+  const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${prefix}-${random}`;
+}
+
+function recommendationFingerprint(item) {
+  return [item.agent, item.beat, item.anchor_text, item.message, item.ghost_text]
+    .map(normalizeText)
+    .join('|');
+}
+
+function normalizeAgentRecommendations(payload) {
+  let raw = Array.isArray(payload?.agents) ? payload.agents : [];
+  if (!raw.length && payload?.agents && typeof payload.agents === 'object') {
+    raw = Object.entries(payload.agents).map(([agent, item]) => ({ agent, ...(item || {}) }));
+  }
+  if (!raw.length && Array.isArray(payload?.recommendations)) raw = payload.recommendations;
+  if (!raw.length && payload?.agent) raw = [payload];
+
+  const text = normalizeText($('prompt').value);
+  const accepted = state.acceptedGhostTexts;
+  const seen = new Set();
+  return raw
+    .map(item => {
+      const agent = String(item?.agent || item?.agent_id || '').toUpperCase();
+      const meta = AGENT_META[agent];
+      if (!meta) return null;
+      return {
+        agent,
+        role: item.role || meta.role,
+        beat: item.beat || meta.beat,
+        anchor_text: String(item.anchor_text || ''),
+        message: String(item.message || item.missing_item || ''),
+        ghost_text: String(item.ghost_text || ''),
+      };
+    })
+    .filter(Boolean)
+    .filter(item => {
+      const ghost = normalizeText(item.ghost_text);
+      if (ghost && (accepted.has(ghost) || text.includes(ghost))) item.ghost_text = '';
+      const fingerprint = recommendationFingerprint(item);
+      if (!item.message && !item.ghost_text) return false;
+      if (seen.has(fingerprint)) return false;
+      seen.add(fingerprint);
+      return true;
+    });
+}
+
+function mergeAgentRecommendations(items, replace = false) {
+  const previous = new Map(state.activeRecommendations.map(item => [item.agent, item]));
+  const next = replace ? new Map() : new Map(state.activeRecommendations.map(item => [item.agent, item]));
+  items.forEach(item => {
+    const old = previous.get(item.agent);
+    if (!old || recommendationFingerprint(old) !== recommendationFingerprint(item)) {
+      const key = AGENT_META[item.agent]?.key;
+      if (key) delete state.dismissed[key];
+    }
+    next.set(item.agent, item);
+  });
+  state.activeRecommendations = [...next.values()];
+  updateContextHint();
+}
+
+function setAgentAvailability(available, message = '') {
+  state.agentsAvailable = available;
+  const notice = $('agent-status-message');
+  notice.hidden = available !== false;
+  if (available === false && message) notice.textContent = message;
+  if (available === false) {
+    state.activeGhostText = '';
+    state.activeRecommendations = [];
+    updateContextHint();
+    updateGhostOverlay();
+    ['director', 'strategist', 'supervisor'].forEach(key => {
+      const status = $(`status-${key}`);
+      if (status) status.textContent = 'unavailable';
+      const badge = $(`info-badge-${key}`);
+      if (badge) badge.style.display = 'none';
+    });
+  }
+}
+
+async function loadAgentConfig() {
+  if (MOCK) return;
+  try {
+    const response = await fetch('/api/devin/config');
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    const configured = data.devin_configured ?? data.configured ?? data.available ?? false;
+    setAgentAvailability(Boolean(configured), 'Devin is not configured. Writing and manual variant selection remain available.');
+  } catch (_) {
+    setAgentAvailability(false, 'AI agents are currently unreachable. Writing and manual variant selection remain available.');
+  }
+}
+
+// Autosize textarea
+function autosize(el) {
+  el.style.height = 'auto';
+  const minH = el.id === 'prompt' ? 220 : 280;
+  const newH = Math.max(minH, el.scrollHeight);
+  el.style.height = `${newH}px`;
+  if (el.id === 'prompt') {
+    const display = $('canvas-display');
+    if (display) display.style.height = `${newH}px`;
+  }
+  updateMirrorDimensions();
+}
+
+function canvasPayload(text = $('prompt').value) {
+  return {
+    title: String(state.canvas.title || 'My Startup Pitch'),
+    text,
+    beats: { ...(state.canvas.beats || {}) },
+    attached_videos: { ...(state.canvas.attached_videos || {}) },
+  };
+}
+
+function hydrateCanvas(canvas) {
+  if (!canvas || typeof canvas !== 'object') return;
+  state.canvas = {
+    title: String(canvas.title || state.canvas.title || 'My Startup Pitch'),
+    text: String(canvas.text ?? state.canvas.text ?? ''),
+    beats: { ...(canvas.beats || {}) },
+    attached_videos: { ...(canvas.attached_videos || {}) },
+  };
+  if (state.canvasHydrated) return;
+  state.canvasHydrated = true;
+  state.hydratingCanvas = true;
+  const locallyEditedText = state.textRevision > 0 ? $('prompt').value : null;
+  const hasTextField = Object.prototype.hasOwnProperty.call(canvas, 'text');
+  const beatText = Object.entries(state.canvas.beats)
+    .filter(([, value]) => String(value || '').trim())
+    .map(([beat, value]) => `${beat}: ${value}`)
+    .join('\n');
+  $('prompt').value = locallyEditedText ?? (hasTextField ? state.canvas.text : beatText);
+  state.canvas.text = $('prompt').value;
+  autosize($('prompt'));
+  state.hydratingCanvas = false;
+  renderAgentRecommendations();
+  if (locallyEditedText !== null) queueCanvasSave();
+}
+
+function queueCanvasSave() {
+  if (state.hydratingCanvas || !state.canvasHydrated) return;
+  const revision = ++state.saveRevision;
+  clearTimeout(state.canvasSaveTimeout);
+  state.canvasSaveTimeout = setTimeout(() => saveCanvas(revision), 280);
+}
+
+async function saveCanvas(revision) {
+  const text = $('prompt').value;
+  const payload = canvasPayload(text);
+  try {
+    const response = await fetch('/api/canvas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error('The canvas could not be saved.');
+    const data = await response.json().catch(() => ({}));
+    if (revision !== state.saveRevision || $('prompt').value !== text) return;
+    const saved = data.canvas && typeof data.canvas === 'object' ? data.canvas : data;
+    state.canvas = {
+      ...state.canvas,
+      ...saved,
+      text,
+      beats: { ...(saved.beats || state.canvas.beats || {}) },
+      attached_videos: { ...(saved.attached_videos || state.canvas.attached_videos || {}) },
+    };
+  } catch (error) {
+    if (revision !== state.saveRevision) return;
+    $('compose-error').textContent = error.message;
+    $('compose-error').hidden = false;
+  }
+}
+
+// Mirror coordinate calculation for relative word positions
+function updateMirrorDimensions() {
+  const prompt = $('prompt');
+  const mirror = $('mirror');
+  const style = window.getComputedStyle(prompt);
+  mirror.style.width = `${prompt.clientWidth}px`;
+  mirror.style.font = style.font;
+  mirror.style.fontFamily = style.fontFamily;
+  mirror.style.fontSize = style.fontSize;
+  mirror.style.fontWeight = style.fontWeight;
+  mirror.style.lineHeight = style.lineHeight;
+  mirror.style.letterSpacing = style.letterSpacing;
+  mirror.style.paddingTop = style.paddingTop;
+  mirror.style.paddingBottom = style.paddingBottom;
+  mirror.style.paddingLeft = style.paddingLeft;
+  mirror.style.paddingRight = style.paddingRight;
+  mirror.style.boxSizing = style.boxSizing;
+}
+
+function getWordCoordinates(charIndex) {
+  const prompt = $('prompt');
+  const mirror = $('mirror');
+  const text = prompt.value || '';
+  const boundedIndex = Math.max(0, Math.min(charIndex, text.length));
+
+  mirror.innerHTML = '';
+  const before = document.createTextNode(text.substring(0, boundedIndex));
+  const marker = document.createElement('span');
+  marker.textContent = text.charAt(boundedIndex) || ' ';
+  const after = document.createTextNode(text.substring(boundedIndex + 1));
+
+  mirror.appendChild(before);
+  mirror.appendChild(marker);
+  mirror.appendChild(after);
+
+  return {
+    top: marker.offsetTop,
+    left: marker.offsetLeft,
+  };
+}
+
+// Update the inline grey ghost text directly in the canvas (flowing displacement for mid-text rewrites)
+function updateGhostOverlay(hideWhileTyping = false) {
+  const prompt = $('prompt');
+  const display = $('canvas-display');
+  const text = prompt.value || '';
+  let ghost = state.activeGhostText || '';
+
+  // Do NOT show ghost text while actively typing, if empty, or while user has text highlighted/selected
+  const hasRangeSelection = document.activeElement === prompt && prompt.selectionStart !== prompt.selectionEnd;
+  if (hideWhileTyping || !ghost || !text.trim() || hasRangeSelection) {
+    display.innerHTML = '';
+    display.classList.remove('visible');
+    prompt.classList.remove('has-ghost');
+    return;
+  }
+
+  // Insert ghost text at caret if caret is in the middle of text, else append at end of text
+  let insertPos = text.length;
+  if (document.activeElement === prompt && typeof prompt.selectionStart === 'number' && prompt.selectionStart < text.length) {
+    insertPos = prompt.selectionStart;
+  }
+
+  const before = text.slice(0, insertPos);
+  const after = text.slice(insertPos);
+
+  // De-duplicate leading word if ghost starts with user's last typed word
+  const lastWordMatch = before.match(/(\S+)\s*$/);
+  if (lastWordMatch) {
+    const lastWord = lastWordMatch[1].toLowerCase();
+    const ghostWords = ghost.trim().split(/\s+/);
+    if (ghostWords.length > 1 && ghostWords[0].toLowerCase() === lastWord) {
+      ghost = ghostWords.slice(1).join(' ');
+    }
+  }
+
+  let prefixSpace = '';
+  if (before && !before.endsWith(' ') && !before.endsWith('\n') && !ghost.startsWith(' ') && !ghost.startsWith('.') && !ghost.startsWith(',')) {
+    prefixSpace = ' ';
+  }
+
+  const escapedBefore = escapeHtml(before);
+  const escapedGhost = escapeHtml(prefixSpace + ghost);
+  const escapedAfter = escapeHtml(after);
+
+  display.innerHTML = `<span>${escapedBefore}</span><span class="ghost-text-grey">${escapedGhost}</span><span>${escapedAfter}</span>`;
+  display.classList.add('visible');
+  prompt.classList.add('has-ghost');
+}
+
+// Dismiss an advice note permanently
+function dismissAdvice(event, agentKey) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  state.dismissed[agentKey] = true;
+  const badge = $(`info-badge-${agentKey}`);
+  if (badge) {
+    badge.style.display = 'none';
+  }
+  updateContextHint();
+}
+
+// Keyboard shortcut: Tab accepts the verbatim grey ghost text directly at caret / replaces targeted rewrite
+$('prompt').addEventListener('keydown', event => {
+  if (event.key === 'Tab' && state.activeGhostText && $('prompt').selectionStart === $('prompt').selectionEnd) {
+    event.preventDefault();
+    const prompt = $('prompt');
+    const text = prompt.value || '';
+    let ghost = state.activeGhostText;
+
+    let insertPos = text.length;
+    if (document.activeElement === prompt && typeof prompt.selectionStart === 'number' && prompt.selectionStart < text.length) {
+      insertPos = prompt.selectionStart;
+    }
+
+    const before = text.slice(0, insertPos);
+    const after = text.slice(insertPos);
+
+    // De-duplicate leading word if ghost starts with user's last typed word
+    const lastWordMatch = before.match(/(\S+)\s*$/);
+    if (lastWordMatch) {
+      const lastWord = lastWordMatch[1].toLowerCase();
+      const ghostWords = ghost.trim().split(/\s+/);
+      if (ghostWords.length > 1 && ghostWords[0].toLowerCase() === lastWord) {
+        ghost = ghostWords.slice(1).join(' ');
+      }
+    }
+
+    let prefixSpace = '';
+    if (before && !before.endsWith(' ') && !before.endsWith('\n') && !ghost.startsWith(' ') && !ghost.startsWith('.') && !ghost.startsWith(',')) {
+      prefixSpace = ' ';
+    }
+
+    prompt.value = before + prefixSpace + ghost + after;
+    const newPos = before.length + prefixSpace.length + ghost.length;
+    prompt.setSelectionRange(newPos, newPos);
+
+    state.acceptedGhostTexts.add(normalizeText(ghost));
+    state.activeGhostText = '';
+    state.textRevision += 1;
+    state.canvas.text = prompt.value;
+    updateGhostOverlay();
+    updateComposer(true);
+    queueCanvasSave();
+  } else if (event.key === 'Escape') {
+    state.activeGhostText = '';
+    updateGhostOverlay();
+    ['director', 'strategist', 'supervisor'].forEach(k => dismissAdvice(null, k));
+  }
+});
+
+// Update ghost dynamically on cursor position change / selection change
+function onCursorSelectionChange() {
+  renderAgentRecommendations();
+}
+
+function anchoredOffset(text, recommendation, fallback) {
+  const anchor = String(recommendation?.anchor_text || '').trim();
+  if (!anchor) return fallback;
+  const index = text.toLocaleLowerCase('en').indexOf(anchor.toLocaleLowerCase('en'));
+  return index >= 0 ? index + anchor.length : fallback;
+}
+
+function idleAgentStatus() {
+  if (state.agentsAvailable === false) return 'unavailable';
+  return state.inflight ? 'thinking …' : 'ready';
+}
+
+document.addEventListener('selectionchange', () => {
+  if (document.activeElement === $('prompt')) {
+    onCursorSelectionChange();
+  }
+});
+$('prompt').addEventListener('keyup', onCursorSelectionChange);
+$('prompt').addEventListener('click', onCursorSelectionChange);
+$('prompt').addEventListener('focus', onCursorSelectionChange);
+$('prompt').addEventListener('scroll', () => {
+  const display = $('canvas-display');
+  if (display) display.scrollTop = $('prompt').scrollTop;
+});
+
+// Position cursors calmly and display (i) info badges only when genuine ideas exist
+function renderAgentRecommendations() {
+  const prompt = $('prompt');
+  const text = prompt.value;
+  const trimmed = text.trim();
+
+  const cDirector = $('cursor-director');
+  const cStrategist = $('cursor-strategist');
+  const cSupervisor = $('cursor-supervisor');
+
+  const badgeDirector = $('info-badge-director');
+  const badgeStrategist = $('info-badge-strategist');
+  const badgeSupervisor = $('info-badge-supervisor');
+
+  const sDirector = $('status-director');
+  const sStrategist = $('status-strategist');
+  const sSupervisor = $('status-supervisor');
+
+  updateMirrorDimensions();
+
+  // If text is empty or too short, keep all 3 cursors stacked cleanly at start (0,0)
+  if (!trimmed || trimmed.length < 5) {
+    cDirector.style.transform = 'translate(0px, 0px)';
+    cStrategist.style.transform = 'translate(0px, 0px)';
+    cSupervisor.style.transform = 'translate(0px, 0px)';
+    badgeDirector.style.display = 'none';
+    badgeStrategist.style.display = 'none';
+    badgeSupervisor.style.display = 'none';
+    state.activeGhostText = '';
+    updateGhostOverlay();
+    const statusText = idleAgentStatus();
+    if (sDirector) sDirector.textContent = statusText;
+    if (sStrategist) sStrategist.textContent = statusText;
+    if (sSupervisor) sSupervisor.textContent = statusText;
+    return;
+  }
+
+  const sentences = text.split(/(?<=[.?!])\s+/).filter(Boolean);
+  const recs = state.activeRecommendations || [];
+
+  const recDir = recs.find(r => r.agent === 'A2' || (r.role && r.role.toLowerCase().includes('director')));
+  const recStrat = recs.find(r => r.agent === 'A3' || (r.role && r.role.toLowerCase().includes('strateg')));
+  const recSuper = recs.find(r => r.agent === 'A1' || (r.role && r.role.toLowerCase().includes('supervisor')));
+
+  // Accurate structural sentence boundaries
+  let firstSentenceEnd = text.length;
+  if (sentences.length > 1) {
+    firstSentenceEnd = text.indexOf(sentences[1]);
+  } else if (text.indexOf('.') !== -1) {
+    firstSentenceEnd = text.indexOf('.') + 1;
+  }
+
+  let stratChar = text.length;
+  if (sentences.length > 2) {
+    stratChar = text.indexOf(sentences[2]);
+  }
+
+  // Strictly bind ghost text to the responsible agent's cursor region
+  let bestGhost = '';
+  const caretPos = (document.activeElement === prompt && typeof prompt.selectionStart === 'number') ? prompt.selectionStart : text.length;
+
+  if (caretPos <= firstSentenceEnd) {
+    // Caret is at Hook (Director)
+    if (recDir && recDir.ghost_text && !state.dismissed['director']) {
+      bestGhost = recDir.ghost_text;
+    } else if (sentences.length === 1 && recStrat && recStrat.ghost_text && !state.dismissed['strategist']) {
+      bestGhost = recStrat.ghost_text;
+    }
+  } else if (caretPos <= stratChar || sentences.length <= 2) {
+    // Caret is in Story / KPIs (Strategist)
+    if (recStrat && recStrat.ghost_text && !state.dismissed['strategist']) {
+      bestGhost = recStrat.ghost_text;
+    } else if (recSuper && recSuper.ghost_text && !state.dismissed['supervisor']) {
+      bestGhost = recSuper.ghost_text;
+    }
+  } else {
+    // Caret is at End of text (Supervisor)
+    if (recSuper && recSuper.ghost_text && !state.dismissed['supervisor']) {
+      bestGhost = recSuper.ghost_text;
+    } else if (recStrat && recStrat.ghost_text && !state.dismissed['strategist']) {
+      bestGhost = recStrat.ghost_text;
+    }
+  }
+
+  // De-duplicate against current text and already accepted ghost texts
+  if (bestGhost) {
+    const bgNorm = bestGhost.trim().toLowerCase();
+    if (text.toLowerCase().includes(bgNorm) || state.acceptedGhostTexts.has(bgNorm)) {
+      bestGhost = '';
+    }
+  }
+  state.activeGhostText = bestGhost;
+  updateGhostOverlay();
+
+  // 1. Director Cursor (Anchored at Hook / Sentence 1 only if active or text exists)
+  const posDir = getWordCoordinates(anchoredOffset(text, recDir, firstSentenceEnd));
+  cDirector.style.transform = `translate(${posDir.left}px, ${posDir.top}px)`;
+
+  if (recDir && !state.dismissed['director'] && (recDir.message || recDir.missing_item)) {
+    $('advice-text-director').textContent = recDir.message || recDir.missing_item;
+    badgeDirector.style.display = 'inline-flex';
+    if (sDirector) sDirector.textContent = 'Hook analysiert';
+  } else {
+    badgeDirector.style.display = 'none';
+    if (sDirector) sDirector.textContent = idleAgentStatus();
+  }
+
+  // 2. Strategist Cursor (Anchored at Middle / Traction / KPIs)
+  const posStrat = getWordCoordinates(anchoredOffset(text, recStrat, stratChar));
+  cStrategist.style.transform = `translate(${posStrat.left}px, ${posStrat.top}px)`;
+
+  if (recStrat && !state.dismissed['strategist'] && (recStrat.message || recStrat.missing_item)) {
+    $('advice-text-strategist').textContent = recStrat.message || recStrat.missing_item;
+    badgeStrategist.style.display = 'inline-flex';
+    if (sStrategist) sStrategist.textContent = 'KPIs analysiert';
+  } else {
+    badgeStrategist.style.display = 'none';
+    if (sStrategist) sStrategist.textContent = idleAgentStatus();
+  }
+
+  // 3. Supervisor Cursor (Anchored at End of Text / CTA)
+  const posSuper = getWordCoordinates(anchoredOffset(text, recSuper, text.length));
+  cSupervisor.style.transform = `translate(${posSuper.left}px, ${posSuper.top}px)`;
+
+  if (recSuper && !state.dismissed['supervisor'] && (recSuper.message || recSuper.missing_item)) {
+    $('advice-text-supervisor').textContent = recSuper.message || recSuper.missing_item;
+    badgeSupervisor.style.display = 'inline-flex';
+    if (sSupervisor) sSupervisor.textContent = 'Length & CTA analyzed';
+  } else {
+    badgeSupervisor.style.display = 'none';
+    if (sSupervisor) sSupervisor.textContent = idleAgentStatus();
+  }
+}
+
+function updateComposer(immediate = false) {
+  autosize($('prompt'));
+  const text = $('prompt').value.trim();
+  $('generate').disabled = text.length < 10 || state.generating;
+  $('create-video').hidden = $('script-result').hidden || state.uploading;
+
+  if (!immediate) {
+    state.orchestrationController?.abort();
+    state.orchestrationController = null;
+    Object.keys(state.assistControllers).forEach(agentId => {
+      state.assistControllers[agentId]?.abort();
+      state.assistControllers[agentId] = null;
+    });
+  }
+
+  if (text.length < 12) {
+    state.orchestrationSequence += 1;
+    state.activeRecommendations = [];
+    state.activeGhostText = '';
+  }
+  updateContextHint();
+
+  // While actively typing: hide badges and ghost text to prevent flickering / distracting jumps
+  if (!immediate) {
+    updateGhostOverlay(true);
+    const badgeDir = $('info-badge-director');
+    const badgeStrat = $('info-badge-strategist');
+    const badgeSuper = $('info-badge-supervisor');
+    if (badgeDir) badgeDir.style.display = 'none';
+    if (badgeStrat) badgeStrat.style.display = 'none';
+    if (badgeSuper) badgeSuper.style.display = 'none';
+  }
+
+  // Deliberate pause before computing suggestions so text doesn't constantly change
+  clearTimeout(state.typingTimeout);
+  if (immediate) {
+    renderAgentRecommendations();
+  } else {
+    state.typingTimeout = setTimeout(renderAgentRecommendations, 300);
+  }
+
+  // 550ms deliberate debounce before asking LLM for new pitch ideas
+  clearTimeout(state.orchestrateDebounce);
+  if (text.length >= 12 && state.agentsAvailable !== false) {
+    state.orchestrateDebounce = setTimeout(triggerAgenticOrchestration, 550);
+  }
+}
+
+async function triggerAgenticOrchestration() {
+  const promptElement = $('prompt');
+  const prompt = promptElement.value.trim();
+  if (prompt.length < 12 || state.agentsAvailable === false) return;
+  const sequence = ++state.orchestrationSequence;
+  const revision = state.textRevision;
+  const requestId = clientRequestId('orchestrate');
+  state.orchestrationController?.abort();
+  const controller = new AbortController();
+  state.orchestrationController = controller;
+  const cursorOffset = typeof promptElement.selectionStart === 'number'
+    ? promptElement.selectionStart
+    : promptElement.value.length;
+  state.inflight = true;
+  beginCanvasAgentActivity(requestId, 'A2 Director started canvas analysis.');
+  renderAgentRecommendations();
+
+  try {
+    const res = await fetch('/api/devin/orchestrate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        text: prompt,
+        cursor_offset: cursorOffset,
+        accepted_ghost_texts: [...state.acceptedGhostTexts],
+        request_id: requestId,
+      }),
+    });
+    if (!res.ok) {
+      if ([401, 403, 429, 503].includes(res.status)) {
+        setAgentAvailability(false, 'AI agents are currently unavailable. The canvas and manual selection remain available.');
+      }
+      return;
+    }
+    const data = await res.json();
+    const responseId = String(data.request_id || requestId);
+    const stale = sequence !== state.orchestrationSequence
+      || revision !== state.textRevision
+      || $('prompt').value.trim() !== prompt
+      || state.seenRequestIds.has(responseId);
+    if (stale) return;
+    state.seenRequestIds.add(responseId);
+    state.lastAppliedRequestId = responseId;
+    mergeAgentRecommendations(normalizeAgentRecommendations(data), true);
+    setAgentAvailability(true);
+  } catch (error) {
+    if (error?.name === 'AbortError') return;
+    if (sequence === state.orchestrationSequence) {
+      setAgentAvailability(false, 'AI agents are currently unreachable. The canvas and manual selection remain available.');
+    }
+  } finally {
+    endCanvasAgentActivity(requestId);
+    if (state.orchestrationController === controller) state.orchestrationController = null;
+    if (sequence === state.orchestrationSequence) {
+      state.inflight = false;
+      renderAgentRecommendations();
+    }
+  }
+}
+
+async function requestAgentAssist(agentId) {
+  const meta = AGENT_META[agentId];
+  const promptElement = $('prompt');
+  const text = promptElement.value.trim();
+  if (!meta || text.length < 5 || state.agentsAvailable === false) return;
+  const sequence = ++state.assistSequences[agentId];
+  const revision = state.textRevision;
+  const requestId = clientRequestId(`assist-${agentId.toLowerCase()}`);
+  state.assistControllers[agentId]?.abort();
+  const controller = new AbortController();
+  state.assistControllers[agentId] = controller;
+  const current = state.activeRecommendations.find(item => item.agent === agentId);
+  state.inflight = true;
+  beginCanvasAgentActivity(requestId, `${agentId} ${meta.role} started the targeted review.`);
+  renderAgentRecommendations();
+  try {
+    const response = await fetch('/api/canvas/assist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        text,
+        cursor_offset: typeof promptElement.selectionStart === 'number' ? promptElement.selectionStart : promptElement.value.length,
+        accepted_ghost_texts: [...state.acceptedGhostTexts],
+        agent_id: agentId,
+        beat: current?.beat || meta.beat,
+        request_id: requestId,
+      }),
+    });
+    if (!response.ok) {
+      if ([401, 403, 429, 503].includes(response.status)) {
+        setAgentAvailability(false, 'The agent is currently unavailable. You can keep writing without it.');
+      }
+      return;
+    }
+    const data = await response.json();
+    const responseId = String(data.request_id || requestId);
+    const stale = sequence !== state.assistSequences[agentId]
+      || revision !== state.textRevision
+      || $('prompt').value.trim() !== text
+      || state.seenRequestIds.has(responseId);
+    if (stale) return;
+    state.seenRequestIds.add(responseId);
+    mergeAgentRecommendations(normalizeAgentRecommendations(data));
+    setAgentAvailability(true);
+  } catch (error) {
+    if (error?.name === 'AbortError') return;
+    if (sequence === state.assistSequences[agentId]) {
+      setAgentAvailability(false, 'The agent is currently unreachable. You can keep writing without it.');
+    }
+  } finally {
+    endCanvasAgentActivity(requestId);
+    if (state.assistControllers[agentId] === controller) {
+      state.assistControllers[agentId] = null;
+    }
+    if (sequence === state.assistSequences[agentId]) {
+      state.inflight = false;
+      renderAgentRecommendations();
+    }
+  }
+}
+
+function renderAttachments() {
+  $('attachments').innerHTML = '';
+  state.files.forEach((file, index) => {
+    const item = document.createElement('span');
+    item.className = 'attachment';
+    item.append(document.createTextNode(file.name));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.setAttribute('aria-label', `${file.name} entfernen`);
+    remove.textContent = '×';
+    remove.onclick = () => {
+      state.files.splice(index, 1);
+      renderAttachments();
+      updateComposer(true);
+    };
+    item.append(remove);
+    $('attachments').append(item);
+  });
+  if (state.files.length) {
+    $('create-video').hidden = false;
+  }
+}
+
+function selectFiles(files) {
+  const incoming = [...files];
+  if (!incoming.length) return;
+  state.files.push(...incoming);
+  renderAttachments();
+}
+
+async function generateScript() {
+  const prompt = $('prompt').value.trim();
+  if (prompt.length < 10 || state.generating) return;
+  state.generating = true;
+  $('compose-error').hidden = true;
+  $('script-result').hidden = false;
+  $('script-output').value = '';
+  $('generator-source').textContent = 'writing …';
+  updateComposer(true);
+  $('script-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const response = await fetch('/api/script', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+    if (!response.ok || !response.body) throw new Error('The script could not be generated.');
+    const source = response.headers.get('X-Pitchcraft-Generator');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      $('script-output').value += decoder.decode(value, { stream: true });
+      autosize($('script-output'));
+    }
+    $('generator-source').textContent = source === 'devin' ? 'created with Devin' : 'local draft';
+  } catch (error) {
+    $('compose-error').textContent = error.message;
+    $('compose-error').hidden = false;
+    $('script-result').hidden = true;
+  } finally {
+    state.generating = false;
+    updateComposer(true);
+  }
+}
+
+async function uploadVideos(files, brief) {
+  const videos = files.filter(f => f.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(f.name));
+  if (!videos.length) {
+    $('compose-error').textContent = 'At least one video file is required to create a video.';
+    $('compose-error').hidden = false;
+    return;
+  }
+  clearTimeout(state.canvasSaveTimeout);
+  if (state.canvasHydrated) await saveCanvas(++state.saveRevision);
+  state.uploading = true;
+  updateComposer(true);
+
+  const form = new FormData();
+  videos.forEach(f => form.append('files', f));
+  if (brief) form.append('brief', brief);
+
+  try {
+    const response = await fetch('/api/upload', { method: 'POST', body: form });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.detail || payload.error || 'The upload failed.');
+    }
+    startJobActivityPolling();
+    poll();
+  } catch (error) {
+    state.uploading = false;
+    stopJobActivityPolling();
+    $('progress').hidden = true;
+    $('toolbar').hidden = false;
+    updateComposer(true);
+    showJobStatus({
+      tone: 'error',
+      title: 'Upload failed',
+      detail: 'The video job could not be started.',
+      eta: 'Stopped',
+      progress: 100,
+    });
+    $('compose-error').textContent = error.message;
+    $('compose-error').hidden = false;
+  }
+}
+
+function renderBeats(beats = []) {
+  $('beats').innerHTML = beats.map(b => `<span class="beat" data-status="${b.status}">${b.id}</span>`).join('');
+}
+
+function validChunkRecommendation(chunk) {
+  const recommendation = chunk?.recommendation;
+  if (!recommendation || !recommendation.variant_id) return null;
+  const status = String(recommendation.status || 'ready').toLowerCase();
+  if (['failed', 'error', 'unavailable', 'pending'].includes(status)) return null;
+  const variant = (chunk.variants || []).find(item => item.id === recommendation.variant_id);
+  return variant ? recommendation : null;
+}
+
+function chunkVideoUrl(chunkId, variant) {
+  return variant.video_url || `/api/chunks/${encodeURIComponent(chunkId)}/variants/${encodeURIComponent(variant.id)}/video`;
+}
+
+function renderChunkReview(chunks = [], selectionComplete = null) {
+  state.chunks = Array.isArray(chunks) ? chunks : [];
+  const list = $('chunk-list');
+  list.innerHTML = '';
+
+  state.chunks.forEach((chunk, index) => {
+    const section = document.createElement('article');
+    section.className = 'chunk';
+    section.dataset.chunkId = chunk.id;
+
+    const head = document.createElement('div');
+    head.className = 'chunk-head';
+    const heading = document.createElement('div');
+    const title = document.createElement('h3');
+    title.className = 'chunk-title';
+    title.textContent = chunk.beat || `Chunk ${index + 1}`;
+    const order = document.createElement('span');
+    order.className = 'chunk-order';
+    order.textContent = `${String(index + 1).padStart(2, '0')} / ${String(state.chunks.length).padStart(2, '0')}`;
+    heading.append(title, order);
+
+    const recommendation = chunk.recommendation;
+    const validRecommendation = validChunkRecommendation(chunk);
+    const recommendationBox = document.createElement('div');
+    recommendationBox.className = 'recommendation';
+    recommendationBox.dataset.status = String(recommendation?.status || (recommendation ? 'ready' : 'missing')).toLowerCase();
+    const badge = document.createElement('span');
+    badge.className = 'recommendation-badge';
+    if (validRecommendation) {
+      const variant = (chunk.variants || []).find(item => item.id === validRecommendation.variant_id);
+      badge.textContent = `AI recommends ${variant?.label || validRecommendation.variant_id}`;
+      recommendationBox.append(badge, document.createTextNode(validRecommendation.reason || 'Based on edit, timing, and overlay checks.'));
+    } else if (recommendation) {
+      badge.textContent = 'AI recommendation unavailable';
+      recommendationBox.append(badge, document.createTextNode(recommendation.reason || 'Compare manually.'));
+    } else if (state.recommendationsStatus === 'pending') {
+      recommendationBox.dataset.status = 'pending';
+      badge.textContent = 'AI is reviewing both variants';
+      recommendationBox.append(badge, document.createTextNode('You can already select manually.'));
+    } else {
+      badge.textContent = 'Manual selection';
+      recommendationBox.append(badge, document.createTextNode('No AI recommendation is available for this chunk.'));
+    }
+    head.append(heading, recommendationBox);
+    section.append(head);
+
+    const grid = document.createElement('div');
+    grid.className = 'variant-grid';
+    const variants = (chunk.variants || []).slice(0, 2);
+    while (variants.length < 2) variants.push(null);
+    variants.forEach((variant, variantIndex) => {
+      const card = document.createElement('div');
+      card.className = 'variant';
+      const selected = Boolean(variant && chunk.selected === variant.id);
+      const recommended = Boolean(variant && validRecommendation?.variant_id === variant.id);
+      card.dataset.selected = String(selected);
+      card.dataset.recommended = String(recommended);
+
+      const video = document.createElement('video');
+      video.controls = true;
+      video.preload = 'metadata';
+      video.playsInline = true;
+      if (variant) {
+        video.src = chunkVideoUrl(chunk.id, variant);
+        video.setAttribute('aria-label', `${chunk.beat || `Chunk ${index + 1}`} – ${variant.label || `Variant ${variantIndex + 1}`}`);
+      } else {
+        video.className = 'unavailable';
+        video.setAttribute('aria-label', 'Variant unavailable');
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'variant-meta';
+      const copy = document.createElement('div');
+      copy.className = 'variant-copy';
+      const name = document.createElement('span');
+      name.className = 'variant-name';
+      const defaultName = variantIndex === 0 ? 'Version A · Clean Cut' : 'Version B · Motion Cut';
+      name.textContent = variant ? [variant.label, variant.name].filter(Boolean).join(' · ') || defaultName : `${defaultName} · unavailable`;
+      const strategy = document.createElement('span');
+      strategy.className = 'variant-strategy';
+      strategy.textContent = variant?.strategy || (variantIndex === 0 ? 'Without motion graphics' : 'With one motion graphic');
+      copy.append(name, strategy);
+
+      const select = document.createElement('button');
+      select.type = 'button';
+      select.className = 'variant-select';
+      const variantStatus = String(variant?.status || 'ready').toLowerCase();
+      select.disabled = !variant || ['failed', 'error', 'unavailable', 'pending'].includes(variantStatus);
+      select.textContent = selected ? 'Selected' : 'Select';
+      if (variant) select.addEventListener('click', () => selectVariant(chunk.id, variant.id));
+      meta.append(copy, select);
+      card.append(video, meta);
+      grid.append(card);
+    });
+    section.append(grid);
+    list.append(section);
+  });
+
+  const selectedCount = state.chunks.filter(chunk => Boolean(chunk.selected)).length;
+  const localComplete = state.chunks.length > 0 && selectedCount === state.chunks.length;
+  const complete = localComplete && selectionComplete !== false;
+  $('selection-status').textContent = complete
+    ? `All ${state.chunks.length} chunks are selected.`
+    : `${selectedCount} of ${state.chunks.length} chunks selected.`;
+  $('finalize').disabled = !complete || state.finalizing;
+  const recommendationCount = state.chunks.filter(validChunkRecommendation).length;
+  $('apply-recommendations').disabled = recommendationCount === 0 || state.applyingRecommendations;
+}
+
+async function selectVariant(chunkId, variantId) {
+  try {
+    const response = await fetch(`/api/chunks/${encodeURIComponent(chunkId)}/selection`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variant_id: variantId }),
+    });
+    if (!response.ok) throw new Error('The selection could not be saved.');
+    const data = await response.json().catch(() => ({}));
+    const chunks = Array.isArray(data.chunks)
+      ? data.chunks
+      : state.chunks.map(chunk => chunk.id === chunkId ? { ...chunk, selected: variantId } : chunk);
+    renderChunkReview(chunks, data.selection_complete ?? null);
+  } catch (error) {
+    $('compose-error').textContent = error.message;
+    $('compose-error').hidden = false;
+  }
+}
+
+async function applyRecommendations() {
+  if ($('apply-recommendations').disabled) return;
+  state.applyingRecommendations = true;
+  renderChunkReview(state.chunks);
+  try {
+    const response = await fetch('/api/chunks/recommendations/apply', { method: 'POST' });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.detail || 'The AI recommendations could not be applied.');
+    }
+    const data = await response.json().catch(() => ({}));
+    const chunks = Array.isArray(data.chunks)
+      ? data.chunks
+      : state.chunks.map(chunk => {
+          const recommendation = validChunkRecommendation(chunk);
+          return recommendation ? { ...chunk, selected: recommendation.variant_id } : chunk;
+        });
+    state.applyingRecommendations = false;
+    renderChunkReview(chunks, data.selection_complete ?? null);
+  } catch (error) {
+    state.applyingRecommendations = false;
+    renderChunkReview(state.chunks);
+    $('compose-error').textContent = error.message;
+    $('compose-error').hidden = false;
+  }
+}
+
+async function finalizeVideo() {
+  if ($('finalize').disabled) return;
+  state.finalizing = true;
+  renderChunkReview(state.chunks, true);
+  try {
+    const response = await fetch('/api/finalize', { method: 'POST' });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.detail || 'The final video could not be started.');
+    }
+    state.uploading = true;
+    startJobActivityPolling();
+    poll();
+  } catch (error) {
+    state.finalizing = false;
+    stopJobActivityPolling();
+    renderChunkReview(state.chunks);
+    showJobStatus({
+      tone: 'error',
+      title: 'Final render failed',
+      detail: 'The job could not be started.',
+      eta: 'Stopped',
+      progress: 100,
+    });
+    $('compose-error').textContent = error.message;
+    $('compose-error').hidden = false;
+  }
+}
+
+function applyServerState(data) {
+  hydrateCanvas(data.canvas || state.canvas);
+  renderBeats(data.coverage?.beats || []);
+  renderJobStatus(data);
+  if (data.phase==='error') {
+    state.uploading = false;
+    state.pollingRecommendations = false;
+    state.finalizing = false;
+    stopJobActivityPolling();
+    $('progress').hidden = true;
+    $('output').hidden = true;
+    $('toolbar').hidden = false;
+    $('compose-error').textContent = data.error || 'Video processing failed.';
+    $('compose-error').hidden = false;
+    return true;
+  }
+  if (data.phase === 'review') {
+    state.uploading = false;
+    state.recommendationsStatus = data.recommendations_status || 'complete';
+    state.pollingRecommendations = data.recommendations_status === 'pending';
+    state.finalizing = false;
+    if (state.pollingRecommendations) startJobActivityPolling();
+    else stopJobActivityPolling();
+    $('progress').hidden = true;
+    $('output').hidden = true;
+    $('chunk-review').hidden = false;
+    $('toolbar').hidden = false;
+    renderChunkReview(data.chunks || [], data.selection_complete ?? null);
+    return !state.pollingRecommendations;
+  }
+  if (data.phase === 'done' && data.video_url) {
+    state.uploading = false;
+    state.pollingRecommendations = false;
+    state.finalizing = false;
+    stopJobActivityPolling();
+    $('progress').hidden = true;
+    $('chunk-review').hidden = true;
+    $('output').hidden = false;
+    $('toolbar').hidden = true;
+    $('player').src = data.video_url;
+    $('export-video').href = data.video_url;
+    $('export-folder').href = data.export_url || '#';
+    $('export-fcpxml').href = data.fcpxml_url || data.export_url || '#';
+    $('export-davinci').href = data.davinci_url || data.resolve_url || data.export_url || '#';
+    return true;
+  }
+  if (data.phase === 'working') {
+    state.uploading = true;
+    state.pollingRecommendations = false;
+    startJobActivityPolling();
+    const jobStarted = ['running', 'finalizing'].includes(String(data.job_status || '').toLowerCase());
+    $('progress').hidden = !jobStarted;
+    $('chunk-review').hidden = jobStarted || !data.selection_complete;
+    $('output').hidden = true;
+    $('toolbar').hidden = false;
+    if (!jobStarted) return false;
+    $('script-result').hidden = true;
+    const score = Math.round((data.coverage?.score || 0) * 100);
+    $('progress-copy').textContent = data.selection_complete
+      ? 'Assembling your selection …'
+      : score
+        ? `Processing chunks in parallel · ${score}% coverage`
+        : 'Analyzing footage …';
+    return false;
+  }
+  state.uploading = false;
+  state.pollingRecommendations = false;
+  stopJobActivityPolling();
+  $('progress').hidden = true;
+  $('chunk-review').hidden = true;
+  $('output').hidden = true;
+  $('toolbar').hidden = false;
+  return true;
+}
+
+async function poll() {
+  if (MOCK) return;
+  try {
+    const response = await fetch('/api/state');
+    if (!response.ok) throw new Error();
+    const done = applyServerState(await response.json());
+    if (done) return;
+  } catch (_) {}
+  if (state.uploading || state.pollingRecommendations) setTimeout(poll, 1500);
+}
+
+async function loadInitialState() {
+  if (MOCK) {
+    const response = await fetch(`mock_state_${MOCK}.json`);
+    const data = await response.json();
+    applyServerState(data);
+    return;
+  }
+  try {
+    const response = await fetch('/api/state');
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    const done = applyServerState(data);
+    if (!done && (state.uploading || state.pollingRecommendations)) setTimeout(poll, 1500);
+  } catch (_) {
+    hydrateCanvas(state.canvas);
+    $('compose-error').textContent = 'The project status could not be loaded. The canvas remains usable.';
+    $('compose-error').hidden = false;
+  }
+}
+
+function startDictation() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    $('compose-error').textContent = 'Dictation is not supported by this browser.';
+    $('compose-error').hidden = false;
+    return;
+  }
+  if (state.recognition) {
+    state.recognition.stop();
+    return;
+  }
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = true;
+  recognition.continuous = true;
+  const base = $('prompt').value.trim();
+
+  recognition.onresult = event => {
+    let transcript = '';
+    for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript;
+    $('prompt').value = [base, transcript].filter(Boolean).join(base ? ' ' : '');
+    $('prompt').dispatchEvent(new Event('input'));
+  };
+  recognition.onend = () => {
+    state.recognition = null;
+    $('mic').classList.remove('listening');
+  };
+  recognition.onerror = () => {
+    $('compose-error').textContent = 'Dictation was interrupted.';
+    $('compose-error').hidden = false;
+  };
+  state.recognition = recognition;
+  $('mic').classList.add('listening');
+  recognition.start();
+}
+
+$('prompt').addEventListener('input', () => {
+  state.textRevision += 1;
+  state.canvas.text = $('prompt').value;
+  $('compose-error').hidden = true;
+  updateComposer(false);
+  queueCanvasSave();
+});
+$('script-output').addEventListener('input', () => autosize($('script-output')));
+$('upload').addEventListener('click', () => $('picker').click());
+$('picker').addEventListener('change', event => {
+  selectFiles(event.target.files);
+  event.target.value = '';
+});
+$('mic').addEventListener('click', startDictation);
+$('generate').addEventListener('click', generateScript);
+$('create-video').addEventListener('click', () => uploadVideos(state.files, $('script-output').value.trim() || $('prompt').value.trim()));
+$('apply-recommendations').addEventListener('click', applyRecommendations);
+$('finalize').addEventListener('click', finalizeVideo);
+$('reset').addEventListener('click', () => location.assign(location.pathname));
+
+document.querySelectorAll('.agent-avatar[data-agent-id]').forEach(avatar => {
+  const request = () => requestAgentAssist(avatar.dataset.agentId);
+  avatar.addEventListener('click', request);
+  avatar.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      request();
+    }
+  });
+});
+
+window.addEventListener('resize', updateMirrorDimensions);
+document.addEventListener('dragover', event => event.preventDefault());
+document.addEventListener('drop', event => {
+  event.preventDefault();
+  selectFiles(event.dataTransfer.files);
+});
+
+window.addEventListener('pagehide', () => {
+  if (!state.canvasHydrated) return;
+  clearTimeout(state.canvasSaveTimeout);
+  fetch('/api/canvas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(canvasPayload()),
+    keepalive: true,
+  }).catch(() => {});
+});
+
+loadAgentConfig();
+loadInitialState().finally(() => updateComposer(true));
+</script>
+</body>
+</html>

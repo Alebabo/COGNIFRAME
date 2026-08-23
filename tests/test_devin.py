@@ -7,7 +7,7 @@ from unittest.mock import call as mock_call
 import pytest
 import requests
 
-from palantum.agents.backends.devin import (
+from pitchcraft.agents.backends.devin import (
     DEVIN_PROMPT_LIMIT_CHARS,
     call,
     continue_session,
@@ -29,7 +29,7 @@ def test_oversized_prompt_is_rejected_before_network_access() -> None:
     context = {"text": "x" * DEVIN_PROMPT_LIMIT_CHARS}
     with (
         patch.dict("os.environ", {"DEVIN_API_KEY": "key"}, clear=True),
-        patch("palantum.agents.backends.devin.requests.post") as post,
+        patch("pitchcraft.agents.backends.devin.requests.post") as post,
         pytest.raises(ValueError, match=r"prompt has .* limit is <30000"),
     ):
         call("A4", "cut", context, {"type": "object"})
@@ -38,8 +38,8 @@ def test_oversized_prompt_is_rejected_before_network_access() -> None:
 
 
 def test_serialize_prompt_matches_transport_wire_format() -> None:
-    assert serialize_prompt("cut", {"quote": "Grün"}) == (
-        'cut\n\nINPUT JSON:\n{"quote":"Grün"}'
+    assert serialize_prompt("cut", {"quote": "Green"}) == (
+        'cut\n\nINPUT JSON:\n{"quote":"Green"}'
     )
 
 
@@ -63,16 +63,16 @@ def test_finished_session_returns_structured_output_and_creation_url() -> None:
             {
                 "DEVIN_API_KEY": "key",
                 "DEVIN_SNAPSHOT_ID": "snapshot-video-use",
-                "PALANTUM_A1_MAX_ACU": "7",
-                "PALANTUM_DEVIN_POLL_INTERVAL_S": "0",
+                "PITCHCRAFT_A1_MAX_ACU": "7",
+                "PITCHCRAFT_DEVIN_POLL_INTERVAL_S": "0",
             },
             clear=True,
         ),
-        patch("palantum.agents.backends.devin.requests.post", return_value=created) as post,
+        patch("pitchcraft.agents.backends.devin.requests.post", return_value=created) as post,
         patch(
-            "palantum.agents.backends.devin.requests.get", return_value=finished
+            "pitchcraft.agents.backends.devin.requests.get", return_value=finished
         ) as get,
-        patch("palantum.agents.backends.devin.requests.delete") as delete,
+        patch("pitchcraft.agents.backends.devin.requests.delete") as delete,
     ):
         result = call(
             "A1",
@@ -89,7 +89,7 @@ def test_finished_session_returns_structured_output_and_creation_url() -> None:
     delete.assert_not_called()
     payload = post.call_args.kwargs["json"]
     assert payload["snapshot_id"] == "snapshot-video-use"
-    assert payload["title"] == "Palantum A1 · run 3"
+    assert payload["title"] == "Pitchcraft A1 · run 3"
     assert payload["tags"] == ["run-3", "A1"]
     assert payload["max_acu_limit"] == 7
     post.assert_called_once_with(
@@ -121,7 +121,7 @@ def test_finished_session_returns_structured_output_and_creation_url() -> None:
 def test_continue_session_sends_one_feedback_message_and_polls_existing_session(
     environment: dict[str, str], message_url: str
 ) -> None:
-    environment["PALANTUM_DEVIN_POLL_INTERVAL_S"] = "0"
+    environment["PITCHCRAFT_DEVIN_POLL_INTERVAL_S"] = "0"
     revised = _response(
         {
             "status_enum": "finished",
@@ -132,8 +132,8 @@ def test_continue_session_sends_one_feedback_message_and_polls_existing_session(
     )
     with (
         patch.dict("os.environ", environment, clear=True),
-        patch("palantum.agents.backends.devin.requests.post", return_value=_response({})) as post,
-        patch("palantum.agents.backends.devin.requests.get", return_value=revised),
+        patch("pitchcraft.agents.backends.devin.requests.post", return_value=_response({})) as post,
+        patch("pitchcraft.agents.backends.devin.requests.get", return_value=revised),
     ):
         result = continue_session(
             "A4",
@@ -181,10 +181,10 @@ def test_cog_pat_discovers_org_and_uses_v3_with_fallback_app_url() -> None:
             clear=True,
         ),
         patch(
-            "palantum.agents.backends.devin.requests.get",
+            "pitchcraft.agents.backends.devin.requests.get",
             side_effect=[self_response, finished],
         ) as get,
-        patch("palantum.agents.backends.devin.requests.post", return_value=created) as post,
+        patch("pitchcraft.agents.backends.devin.requests.post", return_value=created) as post,
     ):
         result = call(
             "A2",
@@ -227,10 +227,10 @@ def test_failed_cog_org_discovery_uses_separate_legacy_key_for_v1(
             clear=True,
         ),
         patch(
-            "palantum.agents.backends.devin.requests.get",
+            "pitchcraft.agents.backends.devin.requests.get",
             side_effect=[self_response, finished],
         ) as get,
-        patch("palantum.agents.backends.devin.requests.post", return_value=created) as post,
+        patch("pitchcraft.agents.backends.devin.requests.post", return_value=created) as post,
     ):
         result = call("A3", "challenge", {}, {"type": "object"})
 
@@ -264,10 +264,10 @@ def test_failed_v3_org_discovery_never_sends_v3_token_to_v1(
     with (
         patch.dict("os.environ", environment, clear=True),
         patch(
-            "palantum.agents.backends.devin.requests.get",
+            "pitchcraft.agents.backends.devin.requests.get",
             return_value=self_response,
         ) as get,
-        patch("palantum.agents.backends.devin.requests.post") as post,
+        patch("pitchcraft.agents.backends.devin.requests.post") as post,
         pytest.raises(RuntimeError, match="Could not resolve a Devin v3 organization"),
     ):
         call("A3", "challenge", {}, {"type": "object"})
@@ -291,9 +291,9 @@ def test_v3_exit_with_structured_output_is_complete() -> None:
             {"DEVIN_PAT": "cog_exit", "DEVIN_ORG_ID": "org-video"},
             clear=True,
         ),
-        patch("palantum.agents.backends.devin.requests.post", return_value=created),
-        patch("palantum.agents.backends.devin.requests.get", return_value=exited),
-        patch("palantum.agents.backends.devin.requests.delete") as delete,
+        patch("pitchcraft.agents.backends.devin.requests.post", return_value=created),
+        patch("pitchcraft.agents.backends.devin.requests.get", return_value=exited),
+        patch("pitchcraft.agents.backends.devin.requests.delete") as delete,
     ):
         result = call("A2", "direct", {}, {"type": "object"})
 
@@ -310,8 +310,8 @@ def test_v3_exit_without_structured_output_is_terminal() -> None:
             {"DEVIN_PAT": "cog_exit", "DEVIN_ORG_ID": "org-video"},
             clear=True,
         ),
-        patch("palantum.agents.backends.devin.requests.post", return_value=created),
-        patch("palantum.agents.backends.devin.requests.get", return_value=exited),
+        patch("pitchcraft.agents.backends.devin.requests.post", return_value=created),
+        patch("pitchcraft.agents.backends.devin.requests.get", return_value=exited),
         pytest.raises(RuntimeError, match=r"ended exit \(user_requested\)"),
     ):
         call("A2", "direct", {}, {"type": "object"})
@@ -333,9 +333,9 @@ def test_v3_error_and_suspended_are_terminal_and_redacted(status: str) -> None:
             {"DEVIN_PAT": token, "DEVIN_ORG_ID": "org-video"},
             clear=True,
         ),
-        patch("palantum.agents.backends.devin.requests.post", return_value=created),
-        patch("palantum.agents.backends.devin.requests.get", return_value=terminal),
-        patch("palantum.agents.backends.devin.requests.delete") as delete,
+        patch("pitchcraft.agents.backends.devin.requests.post", return_value=created),
+        patch("pitchcraft.agents.backends.devin.requests.get", return_value=terminal),
+        patch("pitchcraft.agents.backends.devin.requests.delete") as delete,
         pytest.raises(RuntimeError, match=f"ended {status}") as exc_info,
     ):
         call("A2", "direct", {}, {"type": "object"})
@@ -351,12 +351,12 @@ def test_poll_interval_defaults_to_ten_seconds() -> None:
     finished = _response({"status_enum": "finished", "structured_output": {}})
     with (
         patch.dict("os.environ", {"DEVIN_API_KEY": "key"}, clear=True),
-        patch("palantum.agents.backends.devin.requests.post", return_value=created),
+        patch("pitchcraft.agents.backends.devin.requests.post", return_value=created),
         patch(
-            "palantum.agents.backends.devin.requests.get",
+            "pitchcraft.agents.backends.devin.requests.get",
             side_effect=[working, finished],
         ),
-        patch("palantum.agents.backends.devin.time.sleep") as sleep,
+        patch("pitchcraft.agents.backends.devin.time.sleep") as sleep,
     ):
         call("A3", "challenge", {}, {"type": "object"})
 
@@ -374,8 +374,8 @@ def test_blocked_session_with_structured_output_is_complete() -> None:
     )
     with (
         patch.dict("os.environ", {"DEVIN_API_KEY": "key"}, clear=True),
-        patch("palantum.agents.backends.devin.requests.post", return_value=created),
-        patch("palantum.agents.backends.devin.requests.get", return_value=blocked),
+        patch("pitchcraft.agents.backends.devin.requests.post", return_value=created),
+        patch("pitchcraft.agents.backends.devin.requests.get", return_value=blocked),
     ):
         result = call("A1", "measure", {}, {"type": "object"})
 
@@ -410,7 +410,7 @@ def test_session_creation_error_includes_devin_response_without_exposing_token(
     with (
         patch.dict("os.environ", environment, clear=True),
         patch(
-            "palantum.agents.backends.devin.requests.post", return_value=rejected
+            "pitchcraft.agents.backends.devin.requests.post", return_value=rejected
         ) as post,
         pytest.raises(RuntimeError, match="prompt is too large") as exc_info,
     ):
@@ -445,13 +445,13 @@ def test_terminal_failure_status_is_reported_without_retry(status: str) -> None:
             "os.environ",
             {
                 "DEVIN_API_KEY": token,
-                "PALANTUM_DEVIN_POLL_INTERVAL_S": "0",
+                "PITCHCRAFT_DEVIN_POLL_INTERVAL_S": "0",
             },
             clear=True,
         ),
-        patch("palantum.agents.backends.devin.requests.post", return_value=created) as post,
-        patch("palantum.agents.backends.devin.requests.get", return_value=terminal),
-        patch("palantum.agents.backends.devin.requests.delete") as delete,
+        patch("pitchcraft.agents.backends.devin.requests.post", return_value=created) as post,
+        patch("pitchcraft.agents.backends.devin.requests.get", return_value=terminal),
+        patch("pitchcraft.agents.backends.devin.requests.delete") as delete,
         pytest.raises(RuntimeError, match=status) as exc_info,
     ):
         call("A2", "direct", {}, {"type": "object"})
@@ -466,8 +466,8 @@ def test_finished_session_without_structured_output_is_rejected() -> None:
     finished = _response({"status_enum": "finished", "structured_output": "not-json"})
     with (
         patch.dict("os.environ", {"DEVIN_API_KEY": "key"}, clear=True),
-        patch("palantum.agents.backends.devin.requests.post", return_value=created),
-        patch("palantum.agents.backends.devin.requests.get", return_value=finished),
+        patch("pitchcraft.agents.backends.devin.requests.post", return_value=created),
+        patch("pitchcraft.agents.backends.devin.requests.get", return_value=finished),
         pytest.raises(ValueError, match="returned no structured output"),
     ):
         call("A3", "challenge", {}, {"type": "object"})
@@ -478,7 +478,7 @@ def test_missing_or_blank_token_is_rejected_before_network_access() -> None:
         patch.dict(
             "os.environ", {"DEVIN_PAT": "  ", "DEVIN_API_KEY": ""}, clear=True
         ),
-        patch("palantum.agents.backends.devin.requests.post") as post,
+        patch("pitchcraft.agents.backends.devin.requests.post") as post,
         pytest.raises(ValueError, match="Missing DEVIN_PAT or DEVIN_API_KEY"),
     ):
         call("A1", "measure", {}, {"type": "object"})
@@ -494,17 +494,17 @@ def test_timeout_deletes_each_session_and_retries_once() -> None:
     with (
         patch.dict(
             "os.environ",
-            {"DEVIN_API_KEY": "key", "PALANTUM_DEVIN_TIMEOUT_S": "1"},
+            {"DEVIN_API_KEY": "key", "PITCHCRAFT_DEVIN_TIMEOUT_S": "1"},
             clear=True,
         ),
         patch(
-            "palantum.agents.backends.devin.requests.post", side_effect=[first, second]
+            "pitchcraft.agents.backends.devin.requests.post", side_effect=[first, second]
         ) as post,
-        patch("palantum.agents.backends.devin.requests.get") as get,
+        patch("pitchcraft.agents.backends.devin.requests.get") as get,
         patch(
-            "palantum.agents.backends.devin.requests.delete", return_value=terminated
+            "pitchcraft.agents.backends.devin.requests.delete", return_value=terminated
         ) as delete,
-        patch("palantum.agents.backends.devin.time.monotonic", side_effect=[0, 2, 3, 5]),
+        patch("pitchcraft.agents.backends.devin.time.monotonic", side_effect=[0, 2, 3, 5]),
         pytest.raises(TimeoutError, match="exceeded 1s"),
     ):
         call(

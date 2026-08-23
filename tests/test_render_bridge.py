@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from palantum.engine.render_bridge import (
+from pitchcraft.engine.render_bridge import (
     hide_subtitles_during_overlays,
     patch_render_source,
 )
@@ -23,7 +23,7 @@ def test_windows_render_bridge_normalizes_subtitle_filter_paths() -> None:
         'filter = "overlay=enable=\'between(t,0,1)\'"'
         "\n            build_master_srt(edl, edit_dir, subs_path)\n"
     )
-    with patch("palantum.engine.render_bridge.os.name", "nt"):
+    with patch("pitchcraft.engine.render_bridge.os.name", "nt"):
         result = patch_render_source(source)
 
     assert '.replace("\\\\", "/").replace(":", r"\\:")' in result
@@ -82,7 +82,7 @@ def test_subtitles_are_unchanged_without_motion(tmp_path: Path) -> None:
 
 def test_windows_render_bridge_fails_if_pinned_expression_drifted() -> None:
     with (
-        patch("palantum.engine.render_bridge.os.name", "nt"),
+        patch("pitchcraft.engine.render_bridge.os.name", "nt"),
         pytest.raises(RuntimeError, match="expression changed"),
     ):
         patch_render_source('subs_abs = str(subtitles_path.resolve()).replace(":", r"\\:")')
