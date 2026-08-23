@@ -583,6 +583,7 @@ def _single_motion_scenes(catalog: dict[str, Any], beat: str) -> list[dict[str, 
         and scene.get("status") == "ok"
         and scene.get("static_parse", {}).get("status") == "ok"
     }
+    fallbacks: list[dict[str, Any]] = []
     for scene_id in _GENERIC_MOTION_SCENES.get(beat, ()):
         if scene_id not in candidates:
             continue
@@ -591,8 +592,8 @@ def _single_motion_scenes(catalog: dict[str, Any], beat: str) -> list[dict[str, 
         adapted["adapted_from_type"] = adapted.get("type", "unclassified")
         adapted["type"] = beat
         adapted["confidence"] = max(0.7, float(adapted.get("confidence", 0)))
-        return [adapted]
-    return []
+        fallbacks.append(adapted)
+    return fallbacks
 
 
 def _validate_overlay_plan(
