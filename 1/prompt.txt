@@ -65,3 +65,7 @@ Wie stehen die Chancen für die cognition challenge
 ---
 
 entferne demoein.mp4 aus dem repo
+
+---
+
+auch checkpoint und entire skills nutzen
