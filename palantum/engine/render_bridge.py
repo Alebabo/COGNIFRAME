@@ -121,6 +121,10 @@ def hide_subtitles_during_overlays(
         for visible_start, visible_end in _visible_segments(start, end, windows):
             visible_cues.append((visible_start, visible_end, lines[2:]))
 
+    if not visible_cues:
+        subtitles_path.unlink()
+        return
+
     output: list[str] = []
     for index, (start, end, lines) in enumerate(visible_cues, start=1):
         output.extend(

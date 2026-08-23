@@ -583,6 +583,7 @@ def _single_motion_scenes(catalog: dict[str, Any], beat: str) -> list[dict[str, 
         and scene.get("status") == "ok"
         and scene.get("static_parse", {}).get("status") == "ok"
     }
+    fallbacks: list[dict[str, Any]] = []
     for scene_id in _GENERIC_MOTION_SCENES.get(beat, ()):
         if scene_id not in candidates:
             continue
@@ -591,8 +592,8 @@ def _single_motion_scenes(catalog: dict[str, Any], beat: str) -> list[dict[str, 
         adapted["adapted_from_type"] = adapted.get("type", "unclassified")
         adapted["type"] = beat
         adapted["confidence"] = max(0.7, float(adapted.get("confidence", 0)))
-        return [adapted]
-    return []
+        fallbacks.append(adapted)
+    return fallbacks
 
 
 def _validate_overlay_plan(
@@ -805,7 +806,15 @@ def _render_motion_job(
     if not isinstance(scene, dict):
         raise ValueError("motion overlay has no validated scene")
     prop_qc = _validate_motion_props(scene, props)
-    expected_presentation = str(scene.get("presentation", "overlay"))
+    fullscreen_beats = {
+        beat.strip().upper()
+        for beat in os.environ.get("PALANTUM_FULLSCREEN_BEATS", "").split(",")
+        if beat.strip()
+    }
+    if str(overlay["beat"]).upper() in fullscreen_beats:
+        expected_presentation = "fullscreen"
+    else:
+        expected_presentation = str(scene.get("presentation", "overlay"))
     slot_id = str(overlay["slot_id"])
     existing_slot = edit_dir / "animations" / f"slot_{slot_id}"
     existing_output = existing_slot / "render.mov"
@@ -822,13 +831,19 @@ def _render_motion_job(
         slot_id=slot_id,
         target_width=target_size[0],
         target_height=target_size[1],
+        presentation=expected_presentation,
         render_duration_s=float(overlay["duration"]),
     )
     output = slot / "render.mov"
     reuse = (
         resume
         and existing_output.is_file()
-        and existing_presentation in {expected_presentation, "inset"}
+        and existing_presentation
+        in (
+            {"fullscreen"}
+            if expected_presentation == "fullscreen"
+            else {expected_presentation, "inset"}
+        )
     )
     if not reuse:
         subprocess.run(
@@ -841,7 +856,7 @@ def _render_motion_job(
         raise RuntimeError(f"Remotion did not create {output}")
     presentation = str(existing_presentation) if reuse else expected_presentation
     coverage = _alpha_coverage(output, float(scene["duration_s"]))
-    if coverage > _ALPHA_COVERAGE_LIMIT and presentation != "inset":
+    if coverage > _ALPHA_COVERAGE_LIMIT and presentation not in {"inset", "fullscreen"}:
         slot = materialize_scene(
             source,
             str(overlay["template_id"]),
@@ -857,7 +872,7 @@ def _render_motion_job(
         subprocess.run(build_render_command(slot, output), cwd=slot, check=True)
         presentation = "inset"
         coverage = _alpha_coverage(output, float(scene["duration_s"]))
-    if coverage > _ALPHA_COVERAGE_LIMIT:
+    if coverage > _ALPHA_COVERAGE_LIMIT and presentation != "fullscreen":
         raise ValueError(
             f"motion overlay {slot_id} covers {coverage:.1%} of the frame; "
             f"expected <= {_ALPHA_COVERAGE_LIMIT:.0%}"

@@ -70,6 +70,21 @@ def test_motion_windows_are_removed_from_generated_subtitles(tmp_path: Path) -> 
     )
 
 
+def test_subtitle_file_is_removed_when_motion_covers_all_cues(tmp_path: Path) -> None:
+    subtitles = tmp_path / "master.srt"
+    subtitles.write_text(
+        "1\n00:00:00,000 --> 00:00:02,000\nHIDE ME\n\n"
+        "2\n00:00:02,000 --> 00:00:04,000\nHIDE ME TOO\n",
+        encoding="utf-8",
+    )
+
+    hide_subtitles_during_overlays(
+        subtitles, [{"start_in_output": 0.0, "duration": 5.0}]
+    )
+
+    assert not subtitles.exists()
+
+
 def test_subtitles_are_unchanged_without_motion(tmp_path: Path) -> None:
     subtitles = tmp_path / "master.srt"
     original = "1\n00:00:00,000 --> 00:00:01,000\nKEEP ME\n"
