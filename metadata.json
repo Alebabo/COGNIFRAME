@@ -3,10 +3,28 @@
   "checkpoint_id": "01M0P6CAYGXVVRPX7Z05Q7ZC3Z",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
+    ".env.example",
+    ".gitignore",
+    ".playwright-cli/console-2026-08-23T01-38-47-028Z.log",
+    ".playwright-cli/page-2026-08-23T01-26-27-958Z.yml",
+    ".playwright-cli/page-2026-08-23T01-38-47-390Z.yml",
+    "Bending_Spoons.mp4",
+    "PXL_20260822_214313392.mp4",
+    "docs/architecture.md",
+    "palantum/agents/backends/devin.py",
+    "palantum/agents/runner.py",
+    "palantum/engine/visual.py",
     "palantum/orchestrator.py",
-    "palantum/schemas/roles.json"
+    "palantum/schemas/roles.json",
+    "scripts/make_fixtures.py",
+    "scripts/setup_engine.sh",
+    "tests/test_canvas_api.py",
+    "tests/test_devin_orchestration.py",
+    "tests/test_runner.py",
+    "tests/test_visual.py",
+    "tests/test_web.py"
   ],
   "sessions": [
     {
@@ -15,13 +33,20 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 126799,
+    "input_tokens": 1204128,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 6615621,
-    "output_tokens": 26938,
-    "api_call_count": 80
+    "cache_read_tokens": 38275054,
+    "output_tokens": 150452,
+    "api_call_count": 367
   }
 }

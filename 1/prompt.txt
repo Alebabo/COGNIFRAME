@@ -1,0 +1,72 @@
+# Files pasted by the user:
+
+## "# Palantum — Strategiepapier & Fusionsarchitektur: `main` vs. `large-revamp` ##…": C:\Users\User\.codex/attachments/d7cb9ed2-a1f7-4e2d-b806-65b0f132ac11/pasted-text.txt
+
+Pasted text contains the user's request.
+
+## My request:
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# Palantum-Fusion: Agentic Canvas und Chunk-Video-Engine
+
+## Zusammenfassung
+
+Die Canvas-UX aus `large-revamp` wird mit dem checkpoint-belegten Chunk-Workflow aus `main` vereint. Der gehärtete lokale Motion-Stand bleibt erhalten; `large-revamp` dient als Frontend-Quelle, nicht als ungeprüfte Merge-Wahrheit.
+
+## Implementierung
+
+- Aktuelle sieben getrackte Motion-/Chunk-Änderungen auf `codex/chunk-motion-hardening` separat committen und mit Entire-Checkpoint sichern. Die beiden MP4-Dateien bleiben untracked.
+- Davon `codex/unified-palantum` abzweigen und `origin/large-revamp` bewusst zusammenführen:
+  - Chunk-, Render-, Job- und Exportlogik aus dem gehärteten Stand behalten.
+  - Canvas, Cursor, Advice-Boxen und Flowing-Displacement-Layer aus `large-revamp` übernehmen.
+  - Devin-Backend manuell aus v1-Fehlerbehandlung und v3/PAT-Unterstützung kombinieren.
+- Canvas lokal und atomar in `canvas.json` speichern. Speichern löst keinen langsamen LLM-Aufruf aus.
+- `/api/devin/orchestrate` startet eine echte strukturierte Devin-Orchestration, die getrennte Beiträge von Director, Strategist und Supervisor liefert. Synthetische Session-IDs, OpenAI-Textagenten und statische Vorschlags-Fallbacks entfallen.
+- OpenAI ausschließlich für Whisper verwenden. Schlüssel nur über `.env`/Prozessumgebung laden; kein schreibender Config-Endpunkt und keine Key-Eingabe im Browser.
+- Nach dem Upload weiterhin `analyze → build_chunk_variants` ausführen. Pro semantischem Chunk entstehen parallel:
+  - A: Clean Cut ohne Motion Graphic.
+  - B: Motion Cut mit genau einer validierten Motion Graphic.
+- Einen strukturierten Devin-Rollentyp A5 „Variant Supervisor“ ergänzen. Er vergleicht A/B anhand von Schnitten, Zitaten, Dauer, Overlays und technischen Messwerten und schreibt eine optionale Empfehlung in `chunks.json`. Ein Ausfall blockiert die manuelle Auswahl nicht.
+- Chunk-Review direkt unter dem Canvas einblenden: zwei Player nebeneinander, Empfehlung markieren, manuelle Wahl erlauben und „Alle KI-Empfehlungen übernehmen“ atomar anwenden.
+- Finalisierung erst bei vollständiger Auswahl zulassen; bestehende MP4-, FCPXML-, OTIO-/EDL- und Resolve-kompatible Exporte unverändert weiterverwenden.
+- Beide logischen Meilensteine separat committen und per Entire-Checkpoint dokumentieren.
+
+## API- und Datenverträge
+
+- `POST /api/canvas`: speichert `title`, `text`, `beats` und `attached_videos`; Dictionary-Felder verwenden sichere Default-Factories.
+- `POST /api/devin/orchestrate`: akzeptiert Text, Cursorposition und bereits übernommene Ghost-Texte; liefert eine Request-ID sowie verankerte A1/A2/A3-Empfehlungen.
+- `POST /api/canvas/assist`: liefert eine agentenspezifische JSON-Empfehlung mit `beat`, `anchor_text`, `message` und `ghost_text`.
+- `GET /api/devin/config`: gibt nur Konfigurationsstatus zurück; `POST /api/devin/config` entfällt.
+- `GET /api/state`: enthält weiterhin Canvas, Phase, Coverage, Chunks und `selection_complete`.
+- Jeder Chunk erhält optional `recommendation: {status, variant_id, reason}`.
+- `POST /api/chunks/recommendations/apply`: übernimmt alle gültigen Empfehlungen in einem atomaren Schreibvorgang.
+- Bestehende Auswahl-, Preview-, Finalize-, Video- und Export-Endpunkte bleiben kompatibel.
+- Alte `chunks.json`-Dateien ohne Empfehlungen bleiben lesbar und werden als rein manuelle Reviews dargestellt.
+
+## Testplan
+
+- Vor der Fusion den gesicherten Baseline-Stand erneut mit Pytest, Ruff und MyPy validieren.
+- Canvas-Persistenz, echte gemockte Devin-Antworten, fehlende Keys, Timeouts, veraltete Requests und Anti-Duplikation testen.
+- Upload bis Review mit exakt zwei Varianten je Chunk sowie paralleler Verarbeitung prüfen.
+- Gültige, fehlgeschlagene und teilweise fehlende A5-Empfehlungen testen; manuelle Auswahl muss stets funktionieren.
+- Atomare KI-Übernahme, manuelle Überschreibung und `409` bei unvollständiger Finalisierung prüfen.
+- Overlay-Offsets, genau eine Motion Graphic in Variante B, Master-Render und NLE-Export regressionstesten.
+- Browser-Abnahme für Ghost-Text ohne Überlagerung, drei Cursor, Reload im Review-Zustand, Desktop-Zweispalten- und mobiles Stapellayout durchführen.
+- Abschließend vollständige Suite, Ruff, MyPy, `git diff --check` und Secret-Scan ausführen.
+
+## Annahmen
+
+- Die Integration und Commits bleiben zunächst lokal; kein Push oder Deployment ohne separaten Auftrag.
+- Das Zero-Build-Frontend in einer HTML-Datei bleibt bestehen.
+- Fehlende Devin-Konfiguration deaktiviert nur Agentenvorschläge mit verständlichem Hinweis; Schreiben und manuelle Chunk-Auswahl bleiben nutzbar.
+- Die zwei lokalen MP4-Dateien und vorhandene Renderartefakte werden weder committed noch gelöscht.
+
+---
+
+weiter
+
+---
+
+bitte nutze die entire skills um den checkpoint zu ertstellen und mache es in main

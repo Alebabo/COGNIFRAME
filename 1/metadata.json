@@ -1,0 +1,74 @@
+{
+  "cli_version": "0.10.2",
+  "checkpoint_id": "01M0P6CAYGXVVRPX7Z05Q7ZC3Z",
+  "session_id": "01a02c25-aee5-7211-9950-8b7576246b0f",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-23T02:16:15.5217849Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "save_step_count": 2,
+  "files_touched": [
+    ".env.example",
+    ".gitignore",
+    ".playwright-cli/console-2026-08-23T01-38-47-028Z.log",
+    ".playwright-cli/page-2026-08-23T01-26-27-958Z.yml",
+    ".playwright-cli/page-2026-08-23T01-38-47-390Z.yml",
+    "Bending_Spoons.mp4",
+    "PXL_20260822_214313392.mp4",
+    "docs/architecture.md",
+    "palantum/agents/backends/devin.py",
+    "palantum/agents/runner.py",
+    "palantum/engine/visual.py",
+    "palantum/orchestrator.py",
+    "palantum/schemas/roles.json",
+    "scripts/make_fixtures.py",
+    "scripts/setup_engine.sh",
+    "tests/test_canvas_api.py",
+    "tests/test_devin_orchestration.py",
+    "tests/test_runner.py",
+    "tests/test_visual.py",
+    "tests/test_web.py"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.6-sol",
+  "turn_id": "f8f274c57a35",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 1077329,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 31659433,
+    "output_tokens": 123514,
+    "api_call_count": 287
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-23T02:16:15.1255856Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 0,
+    "total_lines_changed": 0,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 171,
+      "agent_lines_removed": 171
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 171,
+      "agent_lines_removed": 171
+    }
+  ]
+}
