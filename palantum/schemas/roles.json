@@ -213,7 +213,7 @@
           "properties": {
             "slot_id": { "type": "string" },
             "template_id": { "type": "string" },
-            "beat": { "type": "string", "enum": ["PROBLEM", "SOLUTION", "DEMO", "TRACTION", "ASK"] },
+            "beat": { "type": "string", "enum": ["HOOK", "PROBLEM", "SOLUTION", "DEMO", "TRACTION", "TEAM", "ASK"] },
             "start_in_output": { "type": "number", "minimum": 0 },
             "duration": { "type": "number", "exclusiveMinimum": 0 },
             "props": {

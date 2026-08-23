@@ -11,6 +11,7 @@ from palantum.orchestrator import (
     _graphics_overlays,
     _npm_install_command,
     _selectable_scenes,
+    _single_motion_scenes,
     _validate_overlay_plan,
 )
 
@@ -115,17 +116,82 @@ def test_graphics_director_runs_parallel_slot_workers_and_returns_edl_entries(
         "beat": "PROBLEM",
     }
     with (
-        patch("palantum.orchestrator.build_scene_catalog", return_value=catalog),
+        patch("palantum.orchestrator.build_scene_catalog") as build_catalog,
         patch("palantum.orchestrator.run_role", side_effect=run) as roles,
         patch("palantum.orchestrator._render_motion_job", return_value=rendered) as render,
     ):
         result = _graphics_overlays(
-            tmp_path / "edit", {"brand": {}}, ranges, source, (1920, 1080)
+            tmp_path / "edit",
+            {"brand": {}},
+            ranges,
+            source,
+            (1920, 1080),
+            approved_catalog=catalog,
+            required_overlays=1,
         )
 
     assert result == [rendered]
+    build_catalog.assert_not_called()
     assert [call.args[0] for call in roles.call_args_list] == ["A6", "A6W"]
     render.assert_called_once()
+
+
+def test_graphics_overlays_skip_motion_when_no_scene_is_approved(tmp_path: Path) -> None:
+    source = tmp_path / "templates.zip"
+    source.write_bytes(b"fixture")
+
+    with patch("palantum.orchestrator.run_role") as roles:
+        result = _graphics_overlays(
+            tmp_path / "edit",
+            {"brand": {}},
+            [],
+            source,
+            (1920, 1080),
+            approved_catalog={"source": {"sha256": "abc"}, "scenes": []},
+        )
+
+    assert result == []
+    roles.assert_not_called()
+
+
+def test_single_motion_scene_adapts_generic_scene_for_team() -> None:
+    generic = _scene("brand-statement", "unclassified") | {
+        "confidence": 0.5,
+        "static_parse": {"status": "ok"},
+    }
+
+    scenes = _single_motion_scenes({"scenes": [generic]}, "TEAM")
+
+    assert len(scenes) == 1
+    assert scenes[0]["id"] == "brand-statement"
+    assert scenes[0]["type"] == "TEAM"
+    assert scenes[0]["motion_variant_fallback"] is True
+    assert scenes[0]["adapted_from_type"] == "unclassified"
+
+
+def test_required_motion_fails_when_pack_has_no_usable_scene(tmp_path: Path) -> None:
+    source = tmp_path / "templates.zip"
+    source.write_bytes(b"fixture")
+    ranges = [
+        {
+            "source": "take",
+            "start": 0.0,
+            "end": 2.0,
+            "beat": "TEAM",
+            "quote": "team",
+        }
+    ]
+
+    with pytest.raises(RuntimeError, match="no usable scene"):
+        _graphics_overlays(
+            tmp_path / "edit",
+            {"brand": {}},
+            ranges,
+            source,
+            (1920, 1080),
+            approved_catalog={"source": {"sha256": "abc"}, "scenes": []},
+            required_overlays=1,
+        )
 
 
 def test_only_a0_approved_scenes_are_selectable() -> None:
@@ -146,13 +212,9 @@ def test_npm_install_uses_windows_command_launcher() -> None:
 
 def test_role_cache_resumes_without_calling_backend(tmp_path: Path) -> None:
     with patch("palantum.orchestrator.run_role", return_value={"ranges": []}) as run:
-        assert _cached_role(tmp_path, "A4", "A4", "prompt", {}, resume=False) == {
-            "ranges": []
-        }
+        assert _cached_role(tmp_path, "A4", "A4", "prompt", {}, resume=False) == {"ranges": []}
     run.assert_called_once()
 
     with patch("palantum.orchestrator.run_role") as run:
-        assert _cached_role(tmp_path, "A4", "A4", "prompt", {}, resume=True) == {
-            "ranges": []
-        }
+        assert _cached_role(tmp_path, "A4", "A4", "prompt", {}, resume=True) == {"ranges": []}
     run.assert_not_called()

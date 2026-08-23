@@ -55,7 +55,21 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
     edit_dir.mkdir()
     source = tmp_path / "take.mp4"
     source.write_bytes(b"video")
+    template = tmp_path / "templates.zip"
+    template.write_bytes(b"templates")
     _state(edit_dir, source)
+    approved_catalog = {
+        "source": {"sha256": "abc"},
+        "scenes": [
+            {
+                "id": "hero-stat-callout",
+                "type": "PROBLEM",
+                "status": "ok",
+                "confidence": 0.9,
+            }
+        ],
+    }
+    (edit_dir / "scene-catalog.json").write_text(json.dumps(approved_catalog), encoding="utf-8")
     seed = [
         {
             "source": "take",
@@ -109,11 +123,12 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
 
     with (
         patch("palantum.orchestrator._cached_role", side_effect=cached_role),
-        patch("palantum.orchestrator._motion_source", return_value=None),
+        patch("palantum.orchestrator._motion_source", return_value=template),
+        patch("palantum.orchestrator._graphics_overlays", return_value=[]) as graphics,
         patch("palantum.orchestrator.render", side_effect=fake_render),
         patch("palantum.orchestrator.probe", side_effect=_probe),
     ):
-        manifest = build_chunk_variants(edit_dir, [source])
+        manifest = build_chunk_variants(edit_dir, [source], template)
 
     assert manifest["status"] == "review"
     assert len(manifest["chunks"]) == 2
@@ -122,6 +137,11 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
         for chunk in manifest["chunks"]
     )
     assert maximum >= 2
+    assert len(graphics.call_args_list) == 2
+    assert all(
+        call.kwargs["approved_catalog"] == approved_catalog for call in graphics.call_args_list
+    )
+    assert all(call.kwargs["required_overlays"] == 1 for call in graphics.call_args_list)
     assert (edit_dir / "chunks" / "chunk-00-hook" / "a" / "preview.mp4").exists()
 
 

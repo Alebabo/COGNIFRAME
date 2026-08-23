@@ -34,9 +34,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 def _write_json(path: Path, value: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(f"{path.suffix}.tmp")
-    temporary.write_text(
-        json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    temporary.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     temporary.replace(path)
     return path
 
@@ -57,9 +55,7 @@ def _cached_role(
         return _read_json(path)
     output = run_role(role_id, prompt, context, None)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    path.write_text(json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return output
 
 
@@ -184,9 +180,7 @@ def _duration_check(expected_total: float, measured: float) -> dict[str, Any]:
     }
 
 
-def _timeline_views(
-    output: Path, ranges: list[dict[str, Any]], edit_dir: Path
-) -> list[str]:
+def _timeline_views(output: Path, ranges: list[dict[str, Any]], edit_dir: Path) -> list[str]:
     views: list[str] = []
     offset = 0.0
     for index, item in enumerate(ranges):
@@ -337,9 +331,7 @@ def _merge_template_assessment(
         scene["type"] = item["type"]
         scene["confidence"] = min(float(scene.get("confidence", 0)), float(item["confidence"]))
         scene["status"] = (
-            "ok"
-            if static.get("status") == "ok" and item["status"] == "ok"
-            else "broken"
+            "ok" if static.get("status") == "ok" and item["status"] == "ok" else "broken"
         )
     catalog_path.write_text(
         json.dumps(catalog, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
@@ -400,9 +392,7 @@ def analyze(
                 "catalog": catalog,
                 "project_brief": context["project_brief"],
             }
-            a0_future = executor.submit(
-                run_role, "A0", _prompt("A0"), a0_context, None
-            )
+            a0_future = executor.submit(run_role, "A0", _prompt("A0"), a0_context, None)
         a1 = a1_future.result()
         (edit_dir / "script-supervisor.json").write_text(
             json.dumps(a1, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
@@ -487,6 +477,40 @@ def _selectable_scenes(catalog: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+_GENERIC_MOTION_SCENES = {
+    "HOOK": ("brand-statement", "hero-stat-callout"),
+    "PROBLEM": ("hero-stat-callout", "brand-statement"),
+    "SOLUTION": ("step-explainer", "flowchart"),
+    "DEMO": ("screen-showcase", "ui-walkthrough"),
+    "TRACTION": ("saas-metrics-board", "bar-chart-reveal"),
+    "TEAM": ("brand-statement", "hero-stat-callout"),
+    "ASK": ("brand-statement", "hero-stat-callout"),
+}
+
+
+def _single_motion_scenes(catalog: dict[str, Any], beat: str) -> list[dict[str, Any]]:
+    exact = [scene for scene in _selectable_scenes(catalog) if scene.get("type") == beat]
+    if exact:
+        return exact
+    candidates = {
+        str(scene.get("id")): scene
+        for scene in catalog.get("scenes", [])
+        if isinstance(scene, dict)
+        and scene.get("status") == "ok"
+        and scene.get("static_parse", {}).get("status") == "ok"
+    }
+    for scene_id in _GENERIC_MOTION_SCENES.get(beat, ()):
+        if scene_id not in candidates:
+            continue
+        adapted = dict(candidates[scene_id])
+        adapted["motion_variant_fallback"] = True
+        adapted["adapted_from_type"] = adapted.get("type", "unclassified")
+        adapted["type"] = beat
+        adapted["confidence"] = max(0.7, float(adapted.get("confidence", 0)))
+        return [adapted]
+    return []
+
+
 def _validate_overlay_plan(
     overlays: list[dict[str, Any]],
     scenes: list[dict[str, Any]],
@@ -556,9 +580,10 @@ def _validate_overlay_plan(
         validated.append(enriched)
     ordered = sorted(validated, key=lambda item: float(item["start_in_output"]))
     for left, right in zip(ordered, ordered[1:], strict=False):
-        if float(left["start_in_output"]) + float(left["duration"]) > float(
-            right["start_in_output"]
-        ) + 1e-6:
+        if (
+            float(left["start_in_output"]) + float(left["duration"])
+            > float(right["start_in_output"]) + 1e-6
+        ):
             raise ValueError("A6 overlays overlap")
     return validated
 
@@ -618,22 +643,42 @@ def _graphics_overlays(
     target_size: tuple[int, int],
     *,
     resume: bool = False,
+    approved_catalog: dict[str, Any] | None = None,
+    required_overlays: int | None = None,
 ) -> list[dict[str, Any]]:
     catalog_path = edit_dir / "scene-catalog.json"
-    catalog = build_scene_catalog(source, catalog_path)
-    scenes = _selectable_scenes(catalog)
-    if not scenes:
-        raise RuntimeError("the motion catalog has no A0-approved scenes")
+    if approved_catalog is None:
+        catalog = build_scene_catalog(source, catalog_path)
+    else:
+        catalog = approved_catalog
+        _write_json(catalog_path, catalog)
     timeline = _output_ranges(ranges)
+    if required_overlays == 1:
+        beats = {str(item["beat"]) for item in timeline}
+        if len(beats) != 1:
+            raise RuntimeError("a single-motion variant must contain exactly one beat")
+        scenes = _single_motion_scenes(catalog, beats.pop())
+    else:
+        scenes = _selectable_scenes(catalog)
+    if not scenes:
+        if required_overlays:
+            raise RuntimeError("the motion variant has no usable scene")
+        return []
     context = {
         "_session_state_path": str(edit_dir / "sessions.json"),
         "catalog": {"source": catalog["source"], "scenes": scenes},
         "timeline": timeline,
         "brand": state.get("brand", {}),
         "project_brief": state.get("meta", {}).get("brief", ""),
+        "motion_policy": {"required_overlays": required_overlays},
     }
-    plan = _cached_role(edit_dir, "A6", "A6", _prompt("A6"), context, resume=resume)
+    cache_key = "A6-single" if required_overlays == 1 else "A6"
+    plan = _cached_role(edit_dir, cache_key, "A6", _prompt("A6"), context, resume=resume)
     overlays = _validate_overlay_plan(plan["overlays"], scenes, timeline)
+    if required_overlays is not None and len(overlays) != required_overlays:
+        raise RuntimeError(
+            f"the motion variant requires {required_overlays} overlay, got {len(overlays)}"
+        )
     eligible_beats = {str(item["beat"]) for item in timeline} & {
         str(scene["type"]) for scene in scenes
     }
@@ -676,20 +721,21 @@ _CHUNK_VARIANTS = (
     {
         "id": "a",
         "label": "Version A",
-        "name": "Clean Cut",
+        "name": "Clean Cut · ohne Motion Graphic",
         "direction": (
             "Prioritize clarity, natural pauses, and the strongest complete delivery. "
-            "Keep the pacing controlled and leave the speaker visually dominant."
+            "Keep the pacing controlled, leave the speaker visually dominant, and use no "
+            "motion graphic."
         ),
         "motion": False,
     },
     {
         "id": "b",
         "label": "Version B",
-        "name": "Motion Cut",
+        "name": "Motion Cut · eine Motion Graphic",
         "direction": (
             "Build a tighter, more energetic alternative. Prefer concise phrasing and "
-            "leave clean visual room for an integrated UI or motion-graphics treatment."
+            "leave clean visual room for exactly one integrated motion graphic."
         ),
         "motion": True,
     },
@@ -754,6 +800,7 @@ def _build_chunk_variant(
     source_map: dict[str, str],
     base_context: dict[str, Any],
     motion_source: Path | None,
+    approved_catalog: dict[str, Any] | None,
     target_size: tuple[int, int],
     *,
     resume: bool,
@@ -762,9 +809,7 @@ def _build_chunk_variant(
     variant_dir = edit_dir / "chunks" / str(chunk["id"]) / variant_id
     director = base_context["director"]
     beats = [
-        item
-        for item in director.get("beats", [])
-        if str(item.get("id")) == str(chunk["beat"])
+        item for item in director.get("beats", []) if str(item.get("id")) == str(chunk["beat"])
     ]
     context = {
         **base_context,
@@ -799,6 +844,8 @@ def _build_chunk_variant(
             motion_source,
             target_size,
             resume=resume,
+            approved_catalog=approved_catalog,
+            required_overlays=1,
         )
     _copy_chunk_transcripts(edit_dir, variant_dir, ranges)
     preview_edl = {
@@ -808,9 +855,16 @@ def _build_chunk_variant(
         "overlays": overlays,
         "subtitles": "master.srt",
     }
-    _write_json(variant_dir / "edl.json", preview_edl)
+    edl_path = variant_dir / "edl.json"
     preview = variant_dir / "preview.mp4"
-    if not (resume and preview.exists()):
+    reuse_preview = (
+        resume
+        and preview.exists()
+        and edl_path.exists()
+        and _read_json(edl_path) == preview_edl
+    )
+    _write_json(edl_path, preview_edl)
+    if not reuse_preview:
         render(variant_dir, preview, preview=True)
     measured = probe(preview)
     duration = sum(float(item["end"]) - float(item["start"]) for item in ranges)
@@ -880,6 +934,10 @@ def build_chunk_variants(
     first_source = probe(sources[0])
     target_size = (1080, 1920) if first_source.height > first_source.width else (1920, 1080)
     motion_source = _motion_source(template_source, state)
+    catalog_path = edit_dir / "scene-catalog.json"
+    approved_catalog = (
+        _read_json(catalog_path) if motion_source is not None and catalog_path.exists() else None
+    )
     manifest: dict[str, Any] = {
         "version": 1,
         "status": "building",
@@ -909,6 +967,7 @@ def build_chunk_variants(
                     source_map,
                     base_context,
                     motion_source,
+                    approved_catalog,
                     target_size,
                     resume=resume,
                 )
@@ -946,9 +1005,7 @@ def finalize_chunk_variants(edit_dir: Path) -> tuple[dict[str, Any], dict[str, A
             item = dict(overlay)
             item["start_in_output"] = offset + float(item["start_in_output"])
             overlays.append(item)
-        offset += sum(
-            float(item["end"]) - float(item["start"]) for item in selected_ranges
-        )
+        offset += sum(float(item["end"]) - float(item["start"]) for item in selected_ranges)
     state = load(edit_dir, _schema())
     edl = {
         "sources": manifest["sources"],

@@ -9,6 +9,12 @@ from palantum.engine.render_bridge import patch_render_source
 
 def test_windows_render_bridge_normalizes_subtitle_filter_paths() -> None:
     source = (
+        'SUB_FORCE_STYLE = (\n'
+        '    "FontName=Helvetica,FontSize=18,Bold=1,"\n'
+        '    "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H00000000,"\n'
+        '    "BorderStyle=1,Outline=2,Shadow=0,"\n'
+        '    "Alignment=2,MarginV=90"\n'
+        ')\n'
         'subs_abs = str(subtitles_path.resolve()).replace(":", r"\\:")\n'
         'filter = "overlay=enable=\'between(t,0,1)\'"'
     )
@@ -17,6 +23,9 @@ def test_windows_render_bridge_normalizes_subtitle_filter_paths() -> None:
 
     assert '.replace("\\\\", "/").replace(":", r"\\:")' in result
     assert "overlay=eof_action=pass:shortest=0:enable='between" in result
+    assert "FontSize=14" in result
+    assert "Outline=1.5" in result
+    assert "Alignment=2,MarginV=45" in result
 
 
 def test_windows_render_bridge_fails_if_pinned_expression_drifted() -> None:
@@ -25,3 +34,12 @@ def test_windows_render_bridge_fails_if_pinned_expression_drifted() -> None:
         pytest.raises(RuntimeError, match="expression changed"),
     ):
         patch_render_source('subs_abs = str(subtitles_path.resolve()).replace(":", r"\\:")')
+
+
+def test_render_bridge_fails_if_pinned_subtitle_style_drifted() -> None:
+    source = (
+        'subs_abs = str(subtitles_path.resolve()).replace("\\\\", "/").replace(":", r"\\:")\n'
+        'filter = "overlay=eof_action=pass:shortest=0:enable=\'between(t,0,1)\'"'
+    )
+    with pytest.raises(RuntimeError, match="subtitle style changed"):
+        patch_render_source(source)
