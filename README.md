@@ -134,7 +134,7 @@ For the full challenge-to-evidence mapping and the five-minute judging plan, see
 | `timeline.edl` | CMX 3600 fallback |
 | `chunks/` | Version A/B previews and per-chunk manifests |
 
-The repository includes [demoeins.mp4](demoeins.mp4) as the checked-in demo input. The licensed external motion pack itself is intentionally not redistributed.
+Demo inputs and the licensed external motion pack are intentionally not redistributed. Supply a local video through the web interface or CLI.
 
 ## Stack
 
@@ -184,7 +184,7 @@ Palantum's own loader only fills missing variables; it never overwrites an alrea
 ### CLI
 
 ```bash
-uv run palantum --videos-dir ./demo ingest demoeins.mp4 --template-source /path/to/pack
+uv run palantum --videos-dir ./demo ingest /path/to/source-video.mp4 --template-source /path/to/pack
 uv run palantum --videos-dir ./demo status
 uv run palantum --videos-dir ./demo cut --template-source /path/to/pack
 uv run palantum --videos-dir ./demo export
