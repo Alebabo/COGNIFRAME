@@ -8,6 +8,18 @@ The project was built for the Cognition challenge at the Munich European Hackath
 
 > The winning claim is deliberately narrow: COGNIFRAME is not a general video editor and Devin does not render pixels. Devin makes bounded editorial decisions; deterministic local code validates those decisions and executes the media pipeline.
 
+## The team
+
+We are former **TUM.ai Hackathon winners** with hands-on expertise across social media production, professional video cutting, machine learning, and applied AI systems:
+
+- **Video production**: professional editing across social media formats, NLE workflows (Final Cut Pro, DaVinci Resolve), and short-form content at scale
+- **Machine learning**: model training, deployment, and evaluation in production environments
+- **AI systems**: multi-agent orchestration, structured output pipelines, and real-time inference at the application layer
+
+We built COGNIFRAME because we have experienced both sides of this problem — the founder who cannot edit and the editor who cannot read a pitch deck.
+
+---
+
 ## Why it matters
 
 Most editing tools can improve footage that already contains the right story. They cannot recover a missing traction claim, product demonstration, or call to action. COGNIFRAME treats editing as an iterative directing problem:
@@ -18,6 +30,30 @@ Most editing tools can improve footage that already contains the right story. Th
 4. turn approved material into reviewable variants and an editable final package.
 
 The product is the closed loop from diagnosis to a shootable instruction to a verified render—not merely the MP4.
+
+## Real output
+
+The following was produced from an actual founder session on 2026-08-22 after three analysis iterations:
+
+```json
+{
+  "schema": "yc_pitch_60s",
+  "coverage_score": 0.3333,
+  "beats": [
+    { "id": "HOOK",     "status": "weak",    "reason": "Opening spends the first second on a product name the investor has no reason to care about yet." },
+    { "id": "PROBLEM",  "status": "missing", "reason": "No phrase in the take names a sufferer or a pain." },
+    { "id": "SOLUTION", "status": "weak",    "reason": "States a delivery category, not a mechanism — remains true of any competitor." },
+    { "id": "DEMO",     "status": "missing", "reason": "Single take is talking_head with has_ui false — no visual product material." },
+    { "id": "TRACTION", "status": "weak",    "reason": "One number but no time anchor — investor cannot tell if 50 took one month or four years." },
+    { "id": "TEAM",     "status": "weak",    "reason": "Advantage cited belongs to unnamed outsiders — no person on the team is tied to anything unfair." },
+    { "id": "ASK",      "status": "weak",    "reason": "Slogan with no action and no object — a convinced investor has nothing to click, book or reply to." }
+  ]
+}
+```
+
+Score 0.33 after three iterations is not a failure. It means the gate is blocked and the founder receives six shootable Director Notes — each with a verbatim line, a reusable framing, a delivery note, and an exact timeline position. No existing clipping or repurposing tool produces this from raw footage.
+
+---
 
 ## End-to-end workflow
 
@@ -164,6 +200,24 @@ uv run --no-env-file ruff check .
 uv run --no-env-file mypy palantum
 git diff --check
 ```
+
+## Comparison to existing tools
+
+| Capability | Opus Clip | Descript | Runway | COGNIFRAME |
+|-----------|-----------|----------|--------|------------|
+| Works from raw unedited takes | No | Partial | No | Yes |
+| Semantic beat coverage analysis | No | No | No | Yes |
+| Adversarial agent quality check | No | No | No | Yes |
+| Director notes for missing footage | No | No | No | Yes |
+| A/B variant production per beat | No | No | No | Yes |
+| Motion graphic integration | No | No | Partial | Yes |
+| NLE-ready export (FCPXML / OTIO) | No | Yes | No | Yes |
+| QC agent with audio measurement | No | No | No | Yes |
+| Human stays in control | No | Yes | Partial | Yes |
+
+Opus Clip optimizes for virality signals. COGNIFRAME optimizes for investor conviction. These are different problems with different output requirements.
+
+---
 
 ## Scope boundaries
 
