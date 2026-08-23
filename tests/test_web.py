@@ -72,7 +72,19 @@ def test_background_failure_is_exposed_in_state(tmp_path: Path) -> None:
     result = state_payload(tmp_path)
 
     assert result["phase"] == "error"
+    assert result["job_status"] == "failed"
     assert result["error"] == "OPENAI_API_KEY fehlt. Bitte den Schlüssel in der .env konfigurieren."
+
+
+def test_state_payload_exposes_precise_video_job_status(tmp_path: Path) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    (edit / "job.json").write_text(json.dumps({"status": "finalizing"}), encoding="utf-8")
+
+    result = state_payload(tmp_path)
+
+    assert result["phase"] == "working"
+    assert result["job_status"] == "finalizing"
 
 
 def test_upload_passes_motion_pack_to_background_job(tmp_path: Path) -> None:
@@ -416,6 +428,17 @@ def test_frontend_exposes_canvas_agent_status_and_actions(tmp_path: Path) -> Non
     assert 'id="chunk-review"' in response.text
     assert 'id="finalize"' in response.text
     assert 'id="apply-recommendations"' in response.text
+    assert 'id="job-status-card"' in response.text
+    assert 'id="job-status-eta"' in response.text
+    assert 'id="job-status-progress"' in response.text
+    assert 'id="job-agent-activity"' in response.text
+    assert 'id="context-hint-card"' in response.text
+    assert "function renderJobStatus(data)" in response.text
+    assert "function renderAgentActivity(sessions = [])" in response.text
+    assert "function updateContextHint()" in response.text
+    assert "fetch('/api/activity')" in response.text
+    assert "data.job_status" in response.text
+    assert "animation: travel" not in response.text
     assert "new AbortController()" in response.text
     assert "signal: controller.signal" in response.text
     assert "error?.name === 'AbortError'" in response.text
@@ -556,6 +579,39 @@ def test_variant_supervisor_sessions_are_aggregated_by_role(tmp_path: Path) -> N
 
     assert supervisor["status"] == "running"
     assert supervisor["url"] == "https://app.devin.ai/sessions/a5-running"
+
+
+def test_activity_endpoint_reports_agents_without_reading_render_manifest(
+    tmp_path: Path,
+) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    (edit / "job.json").write_text(
+        json.dumps({"status": "running"}), encoding="utf-8"
+    )
+    (edit / "sessions.json").write_text(
+        json.dumps(
+            {
+                "A6": {
+                    "role": "A6",
+                    "status": "running",
+                    "url": "https://app.devin.ai/sessions/a6",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    client = TestClient(create_app(tmp_path))
+
+    with patch("palantum.web.app._read_chunks", side_effect=AssertionError):
+        response = client.get("/api/activity")
+
+    assert response.status_code == 200
+    assert response.json()["job_status"] == "running"
+    graphics = next(
+        item for item in response.json()["sessions"] if item["role"] == "Graphics Director"
+    )
+    assert graphics["status"] == "running"
 
 
 def test_chunk_selection_and_preview_endpoints(tmp_path: Path) -> None:

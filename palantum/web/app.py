@@ -42,6 +42,8 @@ ROLE_NAMES = {
     "A3": "Stratege",
     "A4": "Cutter",
     "A5": "Variant Supervisor",
+    "A6": "Graphics Director",
+    "A6W": "Graphics Worker",
     "A7": "QC",
 }
 _EXECUTOR = ThreadPoolExecutor(max_workers=1)
@@ -473,6 +475,7 @@ def state_payload(videos_dir: Path) -> dict[str, Any]:
     selection_complete = _selection_complete(chunks)
     return {
         "phase": phase,
+        "job_status": job_status or "idle",
         "coverage": {"score": state.get("coverage_score", 0.0), "beats": beats},
         "canvas": canvas,
         "notes": open_notes + resolved_notes,
@@ -581,6 +584,16 @@ def create_app(
     @app.get("/api/state")
     def api_state() -> dict[str, Any]:
         return state_payload(root)
+
+    @app.get("/api/activity")
+    def api_activity() -> dict[str, Any]:
+        """Return live agent activity without waiting for the render manifest lock."""
+        edit_dir = root / "edit"
+        job = _job(edit_dir)
+        return {
+            "job_status": str(job.get("status", "idle")),
+            "sessions": _sessions(edit_dir),
+        }
 
     @app.get("/api/canvas")
     def api_get_canvas() -> dict[str, Any]:

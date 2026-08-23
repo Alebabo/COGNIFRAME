@@ -522,14 +522,162 @@
     top: 0;
     left: 0;
     height: 100%;
-    width: 30%;
+    width: var(--progress-value, 8%);
     background: var(--ink);
-    animation: travel 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    transition: width 320ms ease;
   }
-  @keyframes travel { from { transform: translateX(-110%); } to { transform: translateX(340%); } }
   .progress-copy {
     font-size: 13px;
     color: var(--muted);
+  }
+
+  /* Persistent status surface for long-running jobs and contextual guidance. */
+  .notification-stack {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    width: min(360px, calc(100vw - 32px));
+    display: grid;
+    gap: 10px;
+    z-index: 130;
+    pointer-events: none;
+  }
+  .job-status-card,
+  .context-hint-card {
+    padding: 18px;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 18px 48px rgba(17, 18, 20, 0.14);
+    pointer-events: auto;
+  }
+  .job-status-card[hidden],
+  .context-hint-card[hidden] { display: none; }
+  .job-status-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+  }
+  .job-status-indicator {
+    width: 10px;
+    height: 10px;
+    margin-top: 5px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: #d89b24;
+    box-shadow: 0 0 0 4px #fff5d8;
+  }
+  .job-status-card[data-tone="active"] .job-status-indicator {
+    background: #2563eb;
+    box-shadow: 0 0 0 4px #e5edff;
+  }
+  .job-status-card[data-tone="success"] .job-status-indicator {
+    background: #16824b;
+    box-shadow: 0 0 0 4px #def5e8;
+  }
+  .job-status-card[data-tone="error"] .job-status-indicator {
+    background: #c93838;
+    box-shadow: 0 0 0 4px #fde7e7;
+  }
+  .job-status-body { min-width: 0; flex: 1; }
+  .job-status-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .job-status-detail {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .job-status-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 16px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .job-status-meta strong { color: var(--ink); font-weight: 600; }
+  .job-status-progress {
+    height: 4px;
+    margin-top: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #eceef1;
+  }
+  .job-status-progress span {
+    display: block;
+    width: var(--job-progress, 8%);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--ink);
+    transition: width 320ms ease;
+  }
+  .job-agent-activity {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 13px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    color: var(--ink);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .job-agent-activity[hidden] { display: none; }
+  .job-agent-activity-dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #2563eb;
+    box-shadow: 0 0 0 3px #e5edff;
+  }
+  .job-agent-activity[data-live="true"] .job-agent-activity-dot,
+  .job-agent-activity[data-live="true"] .job-agent-activity-copy {
+    animation: agent-live-blink 1.1s ease-in-out infinite;
+  }
+  @keyframes agent-live-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  .context-hint-card {
+    border-left: 3px solid #d89b24;
+  }
+  .context-hint-card[data-kind="suggestion"] { border-left-color: #2563eb; }
+  .context-hint-kicker {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .context-hint-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .context-hint-detail {
+    display: -webkit-box;
+    margin: 5px 0 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .job-agent-activity[data-live="true"] .job-agent-activity-dot,
+    .job-agent-activity[data-live="true"] .job-agent-activity-copy {
+      animation: none;
+    }
   }
   .beats {
     display: flex;
@@ -862,6 +1010,7 @@
   @media (max-width: 680px) {
     .topbar { padding: 0 16px; }
     main { width: calc(100% - 32px); padding-top: 96px; }
+    .notification-stack { top: 72px; right: 16px; }
     .prompt, .canvas-display, #mirror { font-size: 20px; }
     .toolbar { padding: 0 16px; }
     .actions { grid-template-columns: repeat(2, 1fr); }
@@ -910,6 +1059,34 @@
     </div>
   </div>
 </header>
+
+<div class="notification-stack" aria-label="Status und Hinweise">
+  <aside id="job-status-card" class="job-status-card" data-tone="active" role="status" aria-live="polite" hidden>
+    <div class="job-status-head">
+      <span class="job-status-indicator" aria-hidden="true"></span>
+      <div class="job-status-body">
+        <h2 id="job-status-title" class="job-status-title">Videoauftrag gestartet</h2>
+        <p id="job-status-detail" class="job-status-detail">Der Auftrag wird vorbereitet.</p>
+      </div>
+    </div>
+    <div class="job-status-meta">
+      <span>Geschätzte Restzeit</span>
+      <strong id="job-status-eta">ca. 6–10 Min.</strong>
+    </div>
+    <div id="job-status-progress" class="job-status-progress" role="progressbar" aria-label="Fortschritt der Videoerstellung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8">
+      <span></span>
+    </div>
+    <div id="job-agent-activity" class="job-agent-activity" data-live="false" hidden>
+      <span class="job-agent-activity-dot" aria-hidden="true"></span>
+      <span id="job-agent-activity-copy" class="job-agent-activity-copy"></span>
+    </div>
+  </aside>
+  <aside id="context-hint-card" class="context-hint-card" data-kind="context" role="status" aria-live="polite" hidden>
+    <span id="context-hint-kicker" class="context-hint-kicker">Kontexthinweis</span>
+    <h2 id="context-hint-title" class="context-hint-title">Mehr Kontext benötigt</h2>
+    <p id="context-hint-detail" class="context-hint-detail"></p>
+  </aside>
+</div>
 
 <main>
   <div class="canvas-wrapper">
@@ -1004,7 +1181,7 @@
 
   <!-- Progress Section -->
   <section id="progress" class="progress" aria-live="polite" hidden>
-    <div class="progress-line"></div>
+    <div id="progress-line" class="progress-line" role="progressbar" aria-label="Fortschritt der Videoverarbeitung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8"></div>
     <div id="progress-copy" class="progress-copy">Material wird analysiert …</div>
     <div id="beats" class="beats"></div>
   </section>
@@ -1082,6 +1259,10 @@ const state = {
   seenRequestIds: new Set(),
   lastAppliedRequestId: null,
   agentsAvailable: null,
+  jobStatusTimeout: null,
+  jobActivityPollTimer: null,
+  jobActivityPolling: false,
+  activeCanvasAgents: new Map(),
 };
 
 const AGENT_META = {
@@ -1102,6 +1283,253 @@ function escapeHtml(str) {
 
 function normalizeText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function setProgressValue(value) {
+  const progress = Math.max(0, Math.min(100, Number(value) || 0));
+  const line = $('progress-line');
+  const popupProgress = $('job-status-progress');
+  line.style.setProperty('--progress-value', `${progress}%`);
+  line.setAttribute('aria-valuenow', String(progress));
+  popupProgress.style.setProperty('--job-progress', `${progress}%`);
+  popupProgress.setAttribute('aria-valuenow', String(progress));
+}
+
+function showJobStatus({ tone = 'active', title, detail, eta, progress, autoHide = 0 }) {
+  clearTimeout(state.jobStatusTimeout);
+  state.jobStatusTimeout = null;
+  const card = $('job-status-card');
+  card.dataset.tone = tone;
+  $('job-status-title').textContent = title;
+  $('job-status-detail').textContent = detail;
+  $('job-status-eta').textContent = eta;
+  setProgressValue(progress);
+  card.hidden = false;
+  if (autoHide) {
+    state.jobStatusTimeout = setTimeout(() => {
+      card.hidden = true;
+      state.jobStatusTimeout = null;
+    }, autoHide);
+  }
+}
+
+function hideJobStatus() {
+  clearTimeout(state.jobStatusTimeout);
+  state.jobStatusTimeout = null;
+  $('job-status-card').hidden = true;
+}
+
+function agentActivityCopy(role) {
+  const normalized = String(role || '').toLowerCase();
+  if (normalized.includes('script supervisor')) return 'A1 Script Supervisor hat die Skriptprüfung gestartet.';
+  if (normalized.includes('variant supervisor')) return 'A5 Variant Supervisor bewertet gerade die Schnittvarianten.';
+  if (normalized.includes('graphics director')) return 'A6 Graphics Director plant gerade die Motion Graphics.';
+  if (normalized.includes('graphics worker')) return 'A6 Graphics Worker rendert gerade eine Motion Graphic.';
+  if (normalized.includes('director')) return 'A2 Director hat die Videoanalyse gestartet.';
+  if (normalized.includes('strateg')) return 'A3 Stratege prüft gerade Nutzen und Aussagen.';
+  if (normalized.includes('cutter')) return 'A4 Cutter rendert gerade die Schnittvarianten.';
+  if (normalized === 'qc' || normalized.includes('quality')) return 'A7 Quality Control prüft gerade das Ergebnis.';
+  return role ? `${role} hat einen Arbeitsschritt gestartet.` : '';
+}
+
+function showAgentActivity(copy) {
+  const activity = $('job-agent-activity');
+  if (!copy) {
+    activity.hidden = true;
+    activity.dataset.live = 'false';
+    $('job-agent-activity-copy').textContent = '';
+    return;
+  }
+  $('job-agent-activity-copy').textContent = copy;
+  activity.dataset.live = 'true';
+  activity.hidden = false;
+}
+
+function renderAgentActivity(sessions = []) {
+  const running = (Array.isArray(sessions) ? sessions : [])
+    .find(item => String(item?.status || '').toLowerCase() === 'running');
+  if (running) {
+    showAgentActivity(agentActivityCopy(running.role));
+    return;
+  }
+  const canvasActivity = [...state.activeCanvasAgents.values()].at(-1);
+  showAgentActivity(canvasActivity || '');
+}
+
+function beginCanvasAgentActivity(requestId, copy) {
+  state.activeCanvasAgents.set(requestId, copy);
+  const statusCard = $('job-status-card');
+  if (statusCard.hidden || ['error', 'success'].includes(statusCard.dataset.tone)) {
+    showJobStatus({
+      tone: 'active',
+      title: 'Agent analysiert deinen Text',
+      detail: 'Der aktuelle Inhalt wird geprüft. Du kannst währenddessen weiterschreiben.',
+      eta: 'wenige Sekunden',
+      progress: 35,
+    });
+  }
+  renderAgentActivity();
+}
+
+function endCanvasAgentActivity(requestId) {
+  state.activeCanvasAgents.delete(requestId);
+  renderAgentActivity();
+  if (!state.activeCanvasAgents.size && !state.uploading && !state.pollingRecommendations && !state.finalizing) {
+    hideJobStatus();
+  }
+}
+
+function showContextHint({ kind = 'context', kicker, title, detail }) {
+  const card = $('context-hint-card');
+  card.dataset.kind = kind;
+  $('context-hint-kicker').textContent = kicker;
+  $('context-hint-title').textContent = title;
+  $('context-hint-detail').textContent = detail;
+  card.hidden = false;
+}
+
+function updateContextHint() {
+  const recommendation = state.activeRecommendations.find(item => {
+    const key = AGENT_META[item.agent]?.key;
+    return !key || !state.dismissed[key];
+  });
+  if (recommendation) {
+    const role = recommendation.role || AGENT_META[recommendation.agent]?.role || 'Agent';
+    showContextHint({
+      kind: 'suggestion',
+      kicker: `${recommendation.agent} · ${role}`,
+      title: 'Verbesserungsvorschlag',
+      detail: recommendation.message || recommendation.ghost_text,
+    });
+    return;
+  }
+  const text = $('prompt').value.trim();
+  if (text.length > 0 && text.length < 12) {
+    showContextHint({
+      kind: 'context',
+      kicker: 'Kontexthinweis',
+      title: 'Mehr Kontext benötigt',
+      detail: 'Ergänze Zielgruppe, Problem oder gewünschtes Ergebnis, damit die Agenten sinnvoll starten können.',
+    });
+    return;
+  }
+  $('context-hint-card').hidden = true;
+}
+
+async function pollJobActivity() {
+  if (MOCK) return;
+  state.jobActivityPolling = true;
+  try {
+    const response = await fetch('/api/activity');
+    if (response.ok) {
+      const data = await response.json();
+      renderAgentActivity(data.sessions || []);
+    }
+  } catch (_) {}
+  const keepPolling = state.uploading || state.pollingRecommendations || state.finalizing;
+  if (keepPolling) {
+    state.jobActivityPollTimer = setTimeout(pollJobActivity, 1200);
+  } else {
+    state.jobActivityPollTimer = null;
+    state.jobActivityPolling = false;
+  }
+}
+
+function startJobActivityPolling() {
+  if (MOCK || state.jobActivityPolling || state.jobActivityPollTimer) return;
+  pollJobActivity();
+}
+
+function stopJobActivityPolling() {
+  clearTimeout(state.jobActivityPollTimer);
+  state.jobActivityPollTimer = null;
+  state.jobActivityPolling = false;
+  renderAgentActivity();
+}
+
+function renderJobStatus(data) {
+  const phase = String(data.phase || 'empty').toLowerCase();
+  const reportedStatus = String(data.job_status || '').toLowerCase();
+  renderAgentActivity(data.sessions || []);
+
+  if (phase === 'error') {
+    showJobStatus({
+      tone: 'error',
+      title: 'Videoerstellung fehlgeschlagen',
+      detail: 'Der Auftrag wurde gestoppt. Die genaue Ursache steht im Arbeitsbereich.',
+      eta: 'Gestoppt',
+      progress: 100,
+    });
+    return;
+  }
+
+  if (phase === 'working') {
+    const status = ['queued', 'running', 'finalizing'].includes(reportedStatus)
+      ? reportedStatus
+      : (data.selection_complete ? 'finalizing' : 'running');
+    const presentation = {
+      queued: {
+        tone: 'waiting',
+        title: 'Videoauftrag angenommen',
+        detail: 'Der Upload ist abgeschlossen und wartet auf die Verarbeitung.',
+        eta: 'ca. 6–10 Min.',
+        progress: 12,
+      },
+      running: {
+        tone: 'active',
+        title: 'Video wird erstellt',
+        detail: 'Material wird analysiert, geschnitten und als Varianten gerendert.',
+        eta: 'ca. 4–8 Min.',
+        progress: 58,
+      },
+      finalizing: {
+        tone: 'active',
+        title: 'Finales Video wird gerendert',
+        detail: 'Die ausgewählten Varianten werden zu einem Video zusammengesetzt.',
+        eta: 'ca. 1–3 Min.',
+        progress: 88,
+      },
+    }[status];
+    showJobStatus(presentation);
+    return;
+  }
+
+  if (phase === 'review') {
+    if (data.recommendations_status === 'pending') {
+      showJobStatus({
+        tone: 'active',
+        title: 'Varianten sind gerendert',
+        detail: 'Die KI-Empfehlungen für die Auswahl werden noch geprüft.',
+        eta: 'ca. 1–2 Min.',
+        progress: 94,
+      });
+    } else {
+      showJobStatus({
+        tone: 'success',
+        title: 'Varianten sind bereit',
+        detail: 'Du kannst jetzt die Schnittvarianten vergleichen und auswählen.',
+        eta: 'Abgeschlossen',
+        progress: 100,
+        autoHide: 7000,
+      });
+    }
+    return;
+  }
+
+  if (phase === 'done' && data.video_url) {
+    showJobStatus({
+      tone: 'success',
+      title: 'Video ist fertig',
+      detail: 'Das finale Video kann jetzt angesehen oder exportiert werden.',
+      eta: 'Abgeschlossen',
+      progress: 100,
+      autoHide: 10000,
+    });
+    return;
+  }
+
+  hideJobStatus();
+  setProgressValue(0);
 }
 
 function clientRequestId(prefix) {
@@ -1164,6 +1592,7 @@ function mergeAgentRecommendations(items, replace = false) {
     next.set(item.agent, item);
   });
   state.activeRecommendations = [...next.values()];
+  updateContextHint();
 }
 
 function setAgentAvailability(available, message = '') {
@@ -1174,6 +1603,7 @@ function setAgentAvailability(available, message = '') {
   if (available === false) {
     state.activeGhostText = '';
     state.activeRecommendations = [];
+    updateContextHint();
     updateGhostOverlay();
     ['director', 'strategist', 'supervisor'].forEach(key => {
       const status = $(`status-${key}`);
@@ -1379,6 +1809,7 @@ function dismissAdvice(event, agentKey) {
   if (badge) {
     badge.style.display = 'none';
   }
+  updateContextHint();
 }
 
 // Keyboard shortcut: Tab accepts the verbatim grey ghost text directly at caret / replaces targeted rewrite
@@ -1614,6 +2045,7 @@ function updateComposer(immediate = false) {
     state.activeRecommendations = [];
     state.activeGhostText = '';
   }
+  updateContextHint();
 
   // While actively typing: hide badges and ghost text to prevent flickering / distracting jumps
   if (!immediate) {
@@ -1655,6 +2087,7 @@ async function triggerAgenticOrchestration() {
     ? promptElement.selectionStart
     : promptElement.value.length;
   state.inflight = true;
+  beginCanvasAgentActivity(requestId, 'A2 Director hat die Canvas-Analyse gestartet.');
   renderAgentRecommendations();
 
   try {
@@ -1692,6 +2125,7 @@ async function triggerAgenticOrchestration() {
       setAgentAvailability(false, 'KI-Agenten sind gerade nicht erreichbar. Der Canvas und die manuelle Auswahl funktionieren weiter.');
     }
   } finally {
+    endCanvasAgentActivity(requestId);
     if (state.orchestrationController === controller) state.orchestrationController = null;
     if (sequence === state.orchestrationSequence) {
       state.inflight = false;
@@ -1713,6 +2147,7 @@ async function requestAgentAssist(agentId) {
   state.assistControllers[agentId] = controller;
   const current = state.activeRecommendations.find(item => item.agent === agentId);
   state.inflight = true;
+  beginCanvasAgentActivity(requestId, `${agentId} ${meta.role} hat die gezielte Prüfung gestartet.`);
   renderAgentRecommendations();
   try {
     const response = await fetch('/api/canvas/assist', {
@@ -1750,6 +2185,7 @@ async function requestAgentAssist(agentId) {
       setAgentAvailability(false, 'Der Agent ist gerade nicht erreichbar. Du kannst ohne ihn weiterschreiben.');
     }
   } finally {
+    endCanvasAgentActivity(requestId);
     if (state.assistControllers[agentId] === controller) {
       state.assistControllers[agentId] = null;
     }
@@ -1840,8 +2276,17 @@ async function uploadVideos(files, brief) {
   state.uploading = true;
   $('script-result').hidden = true;
   $('progress').hidden = false;
+  $('progress-copy').textContent = 'Video wird hochgeladen …';
   $('output').hidden = true;
   $('toolbar').hidden = true;
+  showJobStatus({
+    tone: 'waiting',
+    title: 'Videoauftrag gestartet',
+    detail: 'Das Video wird hochgeladen und für die Verarbeitung vorbereitet.',
+    eta: 'ca. 6–10 Min.',
+    progress: 8,
+  });
+  startJobActivityPolling();
 
   const form = new FormData();
   videos.forEach(f => form.append('files', f));
@@ -1856,8 +2301,16 @@ async function uploadVideos(files, brief) {
     poll();
   } catch (error) {
     state.uploading = false;
+    stopJobActivityPolling();
     $('progress').hidden = true;
     $('toolbar').hidden = false;
+    showJobStatus({
+      tone: 'error',
+      title: 'Upload fehlgeschlagen',
+      detail: 'Der Videoauftrag konnte nicht gestartet werden.',
+      eta: 'Gestoppt',
+      progress: 100,
+    });
     $('compose-error').textContent = error.message;
     $('compose-error').hidden = false;
   }
@@ -2039,6 +2492,14 @@ async function finalizeVideo() {
   if ($('finalize').disabled) return;
   state.finalizing = true;
   renderChunkReview(state.chunks, true);
+  showJobStatus({
+    tone: 'waiting',
+    title: 'Finaler Render gestartet',
+    detail: 'Die Auswahl wird für den finalen Videoschnitt vorbereitet.',
+    eta: 'ca. 1–3 Min.',
+    progress: 82,
+  });
+  startJobActivityPolling();
   try {
     const response = await fetch('/api/finalize', { method: 'POST' });
     if (!response.ok) {
@@ -2052,7 +2513,15 @@ async function finalizeVideo() {
     poll();
   } catch (error) {
     state.finalizing = false;
+    stopJobActivityPolling();
     renderChunkReview(state.chunks);
+    showJobStatus({
+      tone: 'error',
+      title: 'Finaler Render fehlgeschlagen',
+      detail: 'Der Auftrag konnte nicht gestartet werden.',
+      eta: 'Gestoppt',
+      progress: 100,
+    });
     $('compose-error').textContent = error.message;
     $('compose-error').hidden = false;
   }
@@ -2061,10 +2530,12 @@ async function finalizeVideo() {
 function applyServerState(data) {
   hydrateCanvas(data.canvas || state.canvas);
   renderBeats(data.coverage?.beats || []);
+  renderJobStatus(data);
   if (data.phase==='error') {
     state.uploading = false;
     state.pollingRecommendations = false;
     state.finalizing = false;
+    stopJobActivityPolling();
     $('progress').hidden = true;
     $('output').hidden = true;
     $('toolbar').hidden = false;
@@ -2077,6 +2548,8 @@ function applyServerState(data) {
     state.recommendationsStatus = data.recommendations_status || 'complete';
     state.pollingRecommendations = data.recommendations_status === 'pending';
     state.finalizing = false;
+    if (state.pollingRecommendations) startJobActivityPolling();
+    else stopJobActivityPolling();
     $('progress').hidden = true;
     $('output').hidden = true;
     $('chunk-review').hidden = false;
@@ -2088,6 +2561,7 @@ function applyServerState(data) {
     state.uploading = false;
     state.pollingRecommendations = false;
     state.finalizing = false;
+    stopJobActivityPolling();
     $('progress').hidden = true;
     $('chunk-review').hidden = true;
     $('output').hidden = false;
@@ -2102,6 +2576,7 @@ function applyServerState(data) {
   if (data.phase === 'working') {
     state.uploading = true;
     state.pollingRecommendations = false;
+    startJobActivityPolling();
     $('progress').hidden = false;
     $('chunk-review').hidden = true;
     $('output').hidden = true;
@@ -2116,6 +2591,7 @@ function applyServerState(data) {
   }
   state.uploading = false;
   state.pollingRecommendations = false;
+  stopJobActivityPolling();
   $('progress').hidden = true;
   $('chunk-review').hidden = true;
   $('output').hidden = true;
