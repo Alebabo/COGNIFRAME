@@ -65,7 +65,7 @@
   "sessions": [
     { "role": "Script Supervisor", "status": "done", "url": null },
     { "role": "Director", "status": "done", "url": null },
-    { "role": "Stratege", "status": "done", "url": null },
+    { "role": "Strategist", "status": "done", "url": null },
     { "role": "Cutter", "status": "running", "url": null },
     { "role": "QC", "status": "idle", "url": null }
   ],

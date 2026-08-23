@@ -36,7 +36,7 @@ def test_canvas_get_and_post_endpoints(tmp_path: Path) -> None:
     res = client.get("/api/canvas")
     assert res.status_code == 200
     data = res.json()
-    assert data["title"] == "Mein Startup Pitch"
+    assert data["title"] == "My Startup Pitch"
     assert "HOOK" in data["beats"]
     assert len(data["agent_cursors"]) == 3
 

@@ -192,7 +192,7 @@ uv run palantum --videos-dir ./demo export
 
 ## Verification
 
-The current suite contains 138 collected tests covering API contracts, deterministic conflict rules, Devin transport and secret redaction, bounded A4 revision, prompt budgets, parallel chunk variants, motion safety, subtitle suppression, export formats, injected-environment precedence, and honest job-progress visibility.
+The current suite contains 140 collected tests covering API contracts, deterministic conflict rules, Devin transport and secret redaction, bounded A4 revision, prompt budgets, parallel chunk variants, motion safety, subtitle suppression, export formats, injected-environment precedence, honest job-progress visibility, English UI copy, and PitchCraft branding.
 
 ```bash
 uv run --no-env-file pytest

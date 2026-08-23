@@ -140,7 +140,7 @@ def _load_canvas(edit_dir: Path) -> dict[str, Any]:
             data = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(data, dict):
                 return build_canvas_metadata(
-                    title=str(data.get("title", "Mein Startup Pitch")),
+                    title=str(data.get("title", "My Startup Pitch")),
                     text=str(data.get("text", "")),
                     beats=data.get("beats") if isinstance(data.get("beats"), dict) else None,
                     attached_videos=(
@@ -149,12 +149,12 @@ def _load_canvas(edit_dir: Path) -> dict[str, Any]:
                         else None
                     ),
                 )
-            raise CanvasPersistenceError("canvas.json enthält kein JSON-Objekt.")
+            raise CanvasPersistenceError("canvas.json does not contain a JSON object.")
         except CanvasPersistenceError:
             raise
         except (OSError, TypeError, ValueError) as error:
             raise CanvasPersistenceError(
-                "canvas.json konnte nicht sicher gelesen werden; die Datei blieb unverändert."
+                "canvas.json could not be read safely; the file was left unchanged."
             ) from error
     return build_canvas_metadata()
 
@@ -262,7 +262,7 @@ def _process_chunk_recommendations(videos_dir: Path, generation_id: str) -> bool
             str(chunk.get("id", "")): {
                 "status": "unavailable",
                 "variant_id": None,
-                "reason": "Die KI-Empfehlung ist derzeit nicht verfügbar.",
+                "reason": "The AI recommendation is currently unavailable.",
             }
             for chunk in snapshot.get("chunks", [])
             if isinstance(chunk, dict) and str(chunk.get("id", ""))
@@ -365,7 +365,7 @@ def _selection_complete(chunks: Any) -> bool:
 def _failure_message(error: Exception) -> str:
     missing = str(error).strip("'") if isinstance(error, KeyError) else ""
     if missing in {"OPENAI_API_KEY", "DEVIN_API_KEY", "DEVIN_PAT"}:
-        return f"{missing} fehlt. Bitte den Schlüssel in der .env konfigurieren."
+        return f"{missing} is missing. Configure the key in the .env file."
     detail = str(error).strip()
     return f"{type(error).__name__}: {detail}" if detail else type(error).__name__
 
@@ -517,7 +517,7 @@ def _process_upload(
                         str(chunk.get("id", "")): {
                             "status": "unavailable",
                             "variant_id": None,
-                            "reason": "Die KI-Empfehlung ist derzeit nicht verfügbar.",
+                            "reason": "The AI recommendation is currently unavailable.",
                         }
                         for chunk in manifest.get("chunks", [])
                         if isinstance(chunk, dict) and str(chunk.get("id", ""))
@@ -547,7 +547,7 @@ def _raise_canvas_error(error: Exception) -> NoReturn:
         raise HTTPException(status_code=503, detail=str(error)) from error
     if isinstance(error, CanvasAgentResponseError):
         raise HTTPException(
-            status_code=502, detail="Devin lieferte keine gültige Empfehlung."
+            status_code=502, detail="Devin did not return a valid recommendation."
         ) from error
     raise error
 
@@ -558,7 +558,7 @@ def _transcribe_with_whisper(path: Path, api_key: str) -> str:
 
     with path.open("rb") as audio_handle:
         transcript = OpenAI(api_key=api_key).audio.transcriptions.create(
-            model="whisper-1", file=audio_handle, language="de"
+            model="whisper-1", file=audio_handle
         )
     return str(transcript.text)
 
@@ -670,7 +670,7 @@ def create_app(
         openai_key = os.getenv("OPENAI_API_KEY", "").strip()
         if not openai_key:
             raise HTTPException(
-                status_code=503, detail="OPENAI_API_KEY ist für Whisper nicht konfiguriert."
+                status_code=503, detail="OPENAI_API_KEY is not configured for Whisper."
             )
         suffix = Path(file.filename or "").suffix
         temporary = root / f".palantum-transcribe-{uuid.uuid4().hex}{suffix}"
@@ -686,7 +686,7 @@ def create_app(
             raise
         except Exception as error:
             raise HTTPException(
-                status_code=502, detail="Whisper-Transkription fehlgeschlagen."
+                status_code=502, detail="Whisper transcription failed."
             ) from error
         finally:
             await file.close()
@@ -709,7 +709,7 @@ def create_app(
                 await upload.close()
             raise HTTPException(
                 status_code=415,
-                detail="Nur MP4-, MOV-, M4V- und WebM-Videos können verarbeitet werden.",
+                detail="Only MP4, MOV, M4V, and WebM videos can be processed.",
             )
         sources: list[Path] = []
         uploads_dir = root / "uploads"

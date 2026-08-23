@@ -17,21 +17,21 @@
       "recommendation": {
         "status": "ready",
         "variant_id": "b",
-        "reason": "Die Motion-Fassung setzt den Einstieg präziser und technisch sauber um."
+        "reason": "The motion version delivers a more precise and technically polished opening."
       },
       "variants": [
         {
           "id": "a",
           "label": "Version A",
           "name": "Clean Cut",
-          "strategy": "Ruhiger Einstieg mit natürlicher Pause und Fokus auf den Sprecher.",
+          "strategy": "A calm opening with a natural pause and focus on the speaker.",
           "video_url": "/api/video"
         },
         {
           "id": "b",
           "label": "Version B",
           "name": "Motion Cut",
-          "strategy": "Engerer Einstieg mit schnellerem Rhythmus und Raum für UI-Motion.",
+          "strategy": "A tighter opening with a faster rhythm and room for UI motion.",
           "video_url": "/api/video"
         }
       ]
@@ -44,21 +44,21 @@
       "recommendation": {
         "status": "unavailable",
         "variant_id": null,
-        "reason": "Die KI-Empfehlung ist derzeit nicht verfügbar."
+        "reason": "The AI recommendation is currently unavailable."
       },
       "variants": [
         {
           "id": "a",
           "label": "Version A",
           "name": "Clean Cut",
-          "strategy": "Die Erklärung bleibt vollständig und der Sprecher visuell dominant.",
+          "strategy": "The explanation remains complete and the speaker stays visually dominant.",
           "video_url": "/api/video"
         },
         {
           "id": "b",
           "label": "Version B",
           "name": "Motion Cut",
-          "strategy": "Kompakte Erklärung mit integrierter Produktoberfläche und Motion Cards.",
+          "strategy": "A concise explanation with an integrated product interface and motion cards.",
           "video_url": "/api/video"
         }
       ]

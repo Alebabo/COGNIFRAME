@@ -13,44 +13,44 @@ BEAT_DEFAULTS = {
     "HOOK": {
         "title": "Hook",
         "time": "3–6s",
-        "description": "Erste 1.5s mit einer konkreten, packenden Aussage. Keine Begrüßung.",
-        "placeholder": "Formuliere deine These oder deinen packenden Einstieg...",
+        "description": "Open with a concrete, compelling statement in the first 1.5s. No greeting.",
+        "placeholder": "State your thesis or write a compelling opening...",
     },
     "PROBLEM": {
         "title": "Problem",
         "time": "6–10s",
-        "description": "Wer leidet unter dem Schmerz und was kostet es wirklich?",
-        "placeholder": "Beschreibe die konkrete Herausforderung der Zielgruppe...",
+        "description": "Who experiences the pain, and what does it really cost them?",
+        "placeholder": "Describe the target audience's concrete problem...",
     },
     "SOLUTION": {
-        "title": "Lösung",
+        "title": "Solution",
         "time": "8–14s",
-        "description": "Der konkrete Mechanismus – wie funktioniert die Lösung genau?",
-        "placeholder": "Erkläre den einzigartigen Mechanismus deiner Lösung...",
+        "description": "Explain the concrete mechanism—how does the solution work?",
+        "placeholder": "Explain the unique mechanism behind your solution...",
     },
     "DEMO": {
         "title": "Demo & Visuals",
         "time": "8–15s",
-        "description": "Sichtbares Produktmaterial oder UI-Walkthrough.",
-        "placeholder": "Zeige oder beschreibe das Produkt im echten Einsatz...",
+        "description": "Show visible product footage or a UI walkthrough.",
+        "placeholder": "Show or describe the product in real use...",
     },
     "TRACTION": {
-        "title": "Traction & Zahlen",
+        "title": "Traction & Metrics",
         "time": "4–8s",
-        "description": "Mindestens eine konkrete Zahl mit klarem Zeitbezug.",
-        "placeholder": "Nenne messbare Nutzerzahlen, Umsatz oder Wachstum...",
+        "description": "Include at least one concrete metric with a clear timeframe.",
+        "placeholder": "Add measurable users, revenue, or growth...",
     },
     "TEAM": {
         "title": "Team",
         "time": "3–6s",
-        "description": "Namen und der entscheidende 'Unfair Advantage'.",
-        "placeholder": "Beschreibe den besonderen Hintergrund und die Kernkompetenz...",
+        "description": "Name the team and its decisive unfair advantage.",
+        "placeholder": "Describe the team's distinctive background and core expertise...",
     },
     "ASK": {
         "title": "Call to Action",
         "time": "3–5s",
-        "description": "Klarer Handlungsaufruf mit konkretem Ziel.",
-        "placeholder": "Formuliere den klaren Aufruf an die Zielgruppe...",
+        "description": "End with a clear call to action and a concrete goal.",
+        "placeholder": "Write a clear call to action for the target audience...",
     },
 }
 
@@ -187,18 +187,21 @@ verbatim substring of INPUT JSON.text. Do not invent an anchor. Keep message con
 ghost_text is an optional continuation to insert immediately after anchor_text. Use an empty
 string when no wording is useful. Never repeat text already present in INPUT JSON.text or in
 accepted_ghost_texts. Continue an unfinished sentence with matching grammar and casing; after
-sentence-ending punctuation, begin a new sentence. Never invent metrics, customers, or facts."""
+sentence-ending punctuation, begin a new sentence. Always write message and ghost_text in English,
+even when the input uses another language. Never invent metrics, customers, or facts."""
 
 _ASSIST_PROMPT = """Act only as the requested Palantum canvas agent and return the requested
 JSON object. anchor_text must be a non-empty, case-sensitive, verbatim substring of INPUT
 JSON.text. Keep message concise. ghost_text, when non-empty, must be wording that can be inserted
 immediately after anchor_text without repeating current or accepted text. Preserve grammatical
-continuation and never invent metrics, customers, or facts."""
+continuation. Always write message and ghost_text in English, even when the input uses another
+language. Never invent metrics, customers, or facts."""
 
 _SCRIPT_PROMPT = """You are Palantum's A1 Script Supervisor. Turn the supplied description into
 a concise, speakable startup video script of about 60 seconds. Use HOOK, PROBLEM, SOLUTION, DEMO,
 TRACTION, TEAM, and ASK sections. Do not invent numbers, customers, results, or product features;
-mark genuinely missing facts briefly in square brackets. Return only the structured JSON."""
+mark genuinely missing facts briefly in square brackets. Write the complete script in English,
+even when the description uses another language. Return only the structured JSON."""
 
 
 def parse_canvas_beats(text: str) -> dict[str, str]:
@@ -228,7 +231,7 @@ def parse_canvas_beats(text: str) -> dict[str, str]:
 
 
 def build_canvas_metadata(
-    title: str = "Mein Startup Pitch",
+    title: str = "My Startup Pitch",
     text: str = "",
     beats: Mapping[str, str] | None = None,
     attached_videos: Mapping[str, str] | None = None,
@@ -247,7 +250,7 @@ def build_canvas_metadata(
         if str(key).strip() and str(value).strip()
     }
     return {
-        "title": title.strip() or "Mein Startup Pitch",
+        "title": title.strip() or "My Startup Pitch",
         "text": text,
         "beats": normalized_beats,
         "beat_info": deepcopy(BEAT_DEFAULTS),

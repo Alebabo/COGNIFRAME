@@ -91,7 +91,7 @@ def test_background_failure_is_exposed_in_state(tmp_path: Path) -> None:
 
     assert result["phase"] == "error"
     assert result["job_status"] == "failed"
-    assert result["error"] == "OPENAI_API_KEY fehlt. Bitte den Schlüssel in der .env konfigurieren."
+    assert result["error"] == "OPENAI_API_KEY is missing. Configure the key in the .env file."
 
 
 def test_state_payload_exposes_precise_video_job_status(tmp_path: Path) -> None:
@@ -451,7 +451,10 @@ def test_frontend_exposes_canvas_agent_status_and_actions(tmp_path: Path) -> Non
     assert 'id="toolbar"' in response.text
     assert 'id="mic"' in response.text
     assert 'id="generate"' in response.text
-    assert 'class="corner-logo"' in response.text
+    assert '<html lang="en">' in response.text
+    assert "<title>PitchCraft</title>" in response.text
+    assert '<img class="brand-logo" src="palantum-logo.png" alt="PitchCraft">' in response.text
+    assert 'class="corner-logo"' not in response.text
     assert 'id="chunk-review"' in response.text
     assert 'id="finalize"' in response.text
     assert 'id="apply-recommendations"' in response.text
@@ -476,6 +479,35 @@ def test_frontend_exposes_canvas_agent_status_and_actions(tmp_path: Path) -> Non
     assert "state.uploading || state.pollingRecommendations" in response.text
 
 
+def test_frontend_keeps_pitchcraft_logo_top_left_and_ui_copy_in_english(
+    tmp_path: Path,
+) -> None:
+    html = TestClient(create_app(tmp_path)).get("/").text
+    topbar = html.split('<header class="topbar">', 1)[1].split("</header>", 1)[0]
+
+    assert topbar.index('class="brand"') < topbar.index('class="agents-nav"')
+    assert '<img class="brand-logo" src="palantum-logo.png" alt="PitchCraft">' in topbar
+    assert ".topbar {" in html
+    assert "top: 0;" in html
+    assert "left: 0;" in html
+    assert ".brand-logo {" in html
+    assert "object-position: left center;" in html
+    assert "Improvement suggestion" in html
+    assert ">Generate</button>" in html
+    assert ">Create video</button>" in html
+    assert "AI recommendation unavailable" in html
+    for german_copy in (
+        "Verbesserungsvorschlag",
+        "Generieren",
+        "Video erstellen",
+        "nicht verfügbar",
+        "Auswählen",
+        "Material wird analysiert",
+        "KI-Empfehlung",
+    ):
+        assert german_copy not in html
+
+
 def test_frontend_defers_job_ui_until_video_processing_is_running(tmp_path: Path) -> None:
     html = TestClient(create_app(tmp_path)).get("/").text
 
@@ -488,7 +520,7 @@ def test_frontend_defers_job_ui_until_video_processing_is_running(tmp_path: Path
 
     assert "showJobStatus" not in canvas_activity
     assert "$('progress').hidden = false" not in upload_start
-    assert "title: 'Videoauftrag gestartet'" not in upload_start
+    assert "title: 'Video job started'" not in upload_start
     assert "if (!['running', 'finalizing'].includes(reportedStatus))" in html
     assert "const jobStarted = ['running', 'finalizing'].includes" in html
 
@@ -511,7 +543,7 @@ def test_state_payload_exposes_two_variants_per_chunk_for_review(tmp_path: Path)
                         "recommendation": {
                             "status": "ready",
                             "variant_id": "b",
-                            "reason": "Die Motion-Fassung erklärt den Beat.",
+                            "reason": "The motion version explains the beat.",
                         },
                         "variants": [
                             {"id": "a", "label": "Version A", "name": "Clean Cut"},
