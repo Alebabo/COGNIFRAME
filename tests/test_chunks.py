@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from palantum.engine.videouse import ProbeResult
 from palantum.orchestrator import (
+    _compact_word_index,
     _recommend_chunk_variant,
     _variant_supervisor_context,
     build_chunk_variants,
@@ -54,6 +55,18 @@ def _state(edit_dir: Path, source: Path) -> None:
 
 def _probe(path: Path) -> ProbeResult:
     return ProbeResult(path, 4.0, 1920, 1080, 24.0, True, [])
+
+
+def test_compact_word_index_rounds_timestamp_noise() -> None:
+    word_index = {
+        "take": [
+            {"text": "hello", "start": 0.1234567, "end": 1.9876543},
+        ]
+    }
+
+    assert _compact_word_index(word_index) == {
+        "take": [{"text": "hello", "start": 0.123, "end": 1.988}]
+    }
 
 
 def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) -> None:

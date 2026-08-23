@@ -113,6 +113,21 @@ def _file_free_probe_context(result: ProbeResult) -> dict[str, Any]:
     }
 
 
+def _compact_word_index(word_index: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Round ASR timestamp noise before embedding the index in an agent prompt."""
+    return {
+        str(source): [
+            {
+                "text": str(item["text"]),
+                "start": round(float(item["start"]), 3),
+                "end": round(float(item["end"]), 3),
+            }
+            for item in words
+        ]
+        for source, words in word_index.items()
+    }
+
+
 def _volume_value(stderr: str, label: str) -> float:
     match = re.search(rf"{label}:\s*(-?(?:\d+(?:\.\d+)?|inf))\s+dB", stderr)
     if not match:
@@ -1028,7 +1043,7 @@ def _chunk_base_context(
         "director": director,
         "script_supervisor": _read_json(supervisor_path) if supervisor_path.exists() else {},
         "takes_packed": (edit_dir / "takes_packed.md").read_text(encoding="utf-8"),
-        "word_index": _read_json(edit_dir / "word_index.json"),
+        "word_index": _compact_word_index(_read_json(edit_dir / "word_index.json")),
     }
 
 
