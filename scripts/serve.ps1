@@ -6,10 +6,10 @@ param(
     [string]$TemplateSource = ""
 )
 
-$palantumArgs = @(
+$pitchcraftArgs = @(
     "run",
     "--no-env-file",
-    "palantum",
+    "pitchcraft",
     "--videos-dir",
     $VideosDir,
     "serve",
@@ -19,8 +19,8 @@ $palantumArgs = @(
     [string]$Port
 )
 if ($TemplateSource) {
-    $palantumArgs += @("--template-source", $TemplateSource)
+    $pitchcraftArgs += @("--template-source", $TemplateSource)
 }
 
-& uv @palantumArgs
+& uv @pitchcraftArgs
 exit $LASTEXITCODE

@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import TypedDict, cast
 
-from palantum.engine.videouse import probe
+from pitchcraft.engine.videouse import probe
 
 
 class Word(TypedDict):
@@ -112,7 +112,7 @@ def transcribe(source: Path, edit_dir: Path) -> Path:
         _write_word_index(edit_dir, source.stem, json.loads(transcript_path.read_text()))
         return transcript_path
     source_probe = probe(source)
-    with tempfile.TemporaryDirectory(prefix="palantum-audio-") as directory:
+    with tempfile.TemporaryDirectory(prefix="pitchcraft-audio-") as directory:
         audio = Path(directory) / "audio.mp3"
         if source_probe.duration_s * 16000 * 2 / 8 > 24_000_000:
             chunks: list[dict[str, object]] = []

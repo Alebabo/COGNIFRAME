@@ -724,7 +724,7 @@ wheels = [
 ]
 
 [[package]]
-name = "palantum"
+name = "pitchcraft"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

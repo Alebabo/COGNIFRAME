@@ -8,9 +8,9 @@ from unittest.mock import patch
 
 import pytest
 
-from palantum.agents.backends.devin import DEVIN_PROMPT_BUDGET_CHARS, serialize_prompt
-from palantum.engine.videouse import ProbeResult
-from palantum.orchestrator import (
+from pitchcraft.agents.backends.devin import DEVIN_PROMPT_BUDGET_CHARS, serialize_prompt
+from pitchcraft.engine.videouse import ProbeResult
+from pitchcraft.orchestrator import (
     _a4_range_findings,
     _budgeted_a4_context,
     _compact_word_index,
@@ -259,7 +259,7 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
         if cache_key == "A4-chunk-plan":
             return {"ranges": seed, "total_duration_s": 4.0, "notes": "plan"}
         if cache_key.startswith("A5-"):
-            return {"variant_id": "b", "reason": "Die Motion-Fassung stützt den Beat."}
+            return {"variant_id": "b", "reason": "The motion version supports the beat."}
         nonlocal active, maximum
         with lock:
             active += 1
@@ -290,11 +290,11 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
         ]
 
     with (
-        patch("palantum.orchestrator._cached_role", side_effect=cached_role),
-        patch("palantum.orchestrator._motion_source", return_value=template),
-        patch("palantum.orchestrator._graphics_overlays", side_effect=fake_graphics) as graphics,
-        patch("palantum.orchestrator.render", side_effect=fake_render),
-        patch("palantum.orchestrator.probe", side_effect=_probe),
+        patch("pitchcraft.orchestrator._cached_role", side_effect=cached_role),
+        patch("pitchcraft.orchestrator._motion_source", return_value=template),
+        patch("pitchcraft.orchestrator._graphics_overlays", side_effect=fake_graphics) as graphics,
+        patch("pitchcraft.orchestrator.render", side_effect=fake_render),
+        patch("pitchcraft.orchestrator.probe", side_effect=_probe),
     ):
         manifest = build_chunk_variants(edit_dir, [source], template)
         assert not any(key.startswith("A5-") for key in role_calls)
@@ -342,7 +342,7 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
         str(chunk["id"]): {
             "status": "ready",
             "variant_id": "b",
-            "reason": "Die Motion-Fassung stützt den Beat.",
+            "reason": "The motion version supports the beat.",
         }
         for chunk in manifest["chunks"]
     }
@@ -411,7 +411,7 @@ def test_variant_supervisor_failure_keeps_manual_review_available(tmp_path: Path
         "run_number": 1,
         "_session_state_path": str(tmp_path / "sessions.json"),
     }
-    with patch("palantum.orchestrator._cached_role", side_effect=TimeoutError("offline")):
+    with patch("pitchcraft.orchestrator._cached_role", side_effect=TimeoutError("offline")):
         recommendation = _recommend_chunk_variant(
             tmp_path,
             {"id": "chunk-00-hook", "beat": "HOOK"},
@@ -423,7 +423,7 @@ def test_variant_supervisor_failure_keeps_manual_review_available(tmp_path: Path
     assert recommendation == {
         "status": "unavailable",
         "variant_id": None,
-        "reason": "Die KI-Empfehlung ist derzeit nicht verfügbar.",
+        "reason": "The AI recommendation is currently unavailable.",
     }
 
 
@@ -492,12 +492,12 @@ def test_finalize_chunk_variants_offsets_selected_chunk_overlays(tmp_path: Path)
         return output
 
     with (
-        patch("palantum.orchestrator.render", side_effect=fake_render),
-        patch("palantum.orchestrator.probe", side_effect=_probe),
-        patch("palantum.orchestrator._audio_check", return_value={}),
-        patch("palantum.orchestrator._timeline_views", return_value=[]),
+        patch("pitchcraft.orchestrator.render", side_effect=fake_render),
+        patch("pitchcraft.orchestrator.probe", side_effect=_probe),
+        patch("pitchcraft.orchestrator._audio_check", return_value={}),
+        patch("pitchcraft.orchestrator._timeline_views", return_value=[]),
         patch(
-            "palantum.orchestrator.run_role",
+            "pitchcraft.orchestrator.run_role",
             return_value={"findings": [], "verdict": "pass"},
         ),
     ):

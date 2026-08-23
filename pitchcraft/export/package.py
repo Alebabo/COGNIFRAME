@@ -9,7 +9,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
-from palantum.engine.videouse import probe
+from pitchcraft.engine.videouse import probe
 
 SPURS = {
     "aroll": ("V1", 1),
@@ -238,9 +238,13 @@ def _write_fcpxml(
     )
     metadata = ET.SubElement(sequence, "metadata")
     for name, (spur, lane) in SPURS.items():
-        ET.SubElement(metadata, "md", {"key": f"palantum:{spur}", "value": name, "lane": str(lane)})
+        ET.SubElement(
+            metadata, "md", {"key": f"pitchcraft:{spur}", "value": name, "lane": str(lane)}
+        )
     for name, (spur, lane) in AUDIO_SPURS.items():
-        ET.SubElement(metadata, "md", {"key": f"palantum:{spur}", "value": name, "lane": str(lane)})
+        ET.SubElement(
+            metadata, "md", {"key": f"pitchcraft:{spur}", "value": name, "lane": str(lane)}
+        )
     spine = ET.SubElement(sequence, "spine")
     offset = 0.0
     for index, clip in enumerate(clips):
@@ -440,7 +444,7 @@ def _write_otio(
 
 
 def _write_edl(package_dir: Path, clips: list[dict[str, Any]], fps: float) -> None:
-    lines = ["TITLE: PALANTUM EXPORT", "FCM: NON-DROP FRAME", ""]
+    lines = ["TITLE: PITCHCRAFT EXPORT", "FCM: NON-DROP FRAME", ""]
     record = 0
     for index, clip in enumerate(clips, start=1):
         duration = _frames(clip["end"] - clip["start"], fps)
@@ -476,7 +480,7 @@ def export_project(edit_dir: Path, output_parent: Path | None = None) -> Path:
         raise ValueError(f"rendered output has invalid frame rate: {fps}")
     project_name = edit_dir.parent.name
     parent = output_parent or edit_dir.parent
-    package_dir = parent / f"palantum_export_{project_name}"
+    package_dir = parent / f"pitchcraft_export_{project_name}"
     if package_dir.exists():
         shutil.rmtree(package_dir)
     for directory in ("aroll", "broll", "graphics", "audio"):
@@ -493,13 +497,13 @@ def export_project(edit_dir: Path, output_parent: Path | None = None) -> Path:
     _write_otio(package_dir, clips, graphics, srt, fps)
     _write_edl(package_dir, clips, fps)
     (package_dir / "README.txt").write_text(
-        "Dieses Paket ist der auftrennbare Palantum-Schnitt für "
+        "This package is the editable PitchCraft cut for "
         f"{project_name}.\n\n"
-        "Öffne timeline.fcpxml in DaVinci Resolve oder Final Cut Pro. "
-        "timeline.otio und timeline.edl sind Fallbacks für andere NLEs.\n"
-        "V1 enthält A-Roll, V2 B-Roll, V3 Grafiken und V4 Untertitel als Titel.\n"
-        "A1 enthält die separate Sprachspur; A2 bleibt für Musik reserviert.\n"
-        "Die Untertitel bleiben editierbare Titel und sind nicht in das Video eingebrannt.\n"
-        "CapCut wird nicht unterstützt.\n"
+        "Open timeline.fcpxml in DaVinci Resolve or Final Cut Pro. "
+        "timeline.otio and timeline.edl are fallbacks for other NLEs.\n"
+        "V1 contains A-roll, V2 B-roll, V3 graphics, and V4 subtitles as titles.\n"
+        "A1 contains the separate voice track; A2 remains reserved for music.\n"
+        "Subtitles remain editable titles and are not burned into the video.\n"
+        "CapCut is not supported.\n"
     )
     return package_dir

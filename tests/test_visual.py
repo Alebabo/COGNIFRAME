@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
-from palantum.engine import visual
+from pitchcraft.engine import visual
 
 
 def test_visual_classification_stays_local_and_conservative(tmp_path: Path) -> None:
@@ -16,13 +17,13 @@ def test_visual_classification_stays_local_and_conservative(tmp_path: Path) -> N
         "kind": "unknown",
         "has_ui": False,
         "description": (
-            "Lokale Frames wurden extrahiert; eine semantische "
-            "Bildklassifizierung ist nicht aktiviert."
+            "Local frames were extracted; semantic "
+            "image classification is not enabled."
         ),
     }
 
 
-def test_visual_failure_is_cached_as_unknown(tmp_path: Path, monkeypatch: object) -> None:
+def test_visual_failure_is_cached_as_unknown(tmp_path: Path, monkeypatch: Any) -> None:
     source = tmp_path / "take.mp4"
     source.write_bytes(b"source")
     edit = tmp_path / "edit"

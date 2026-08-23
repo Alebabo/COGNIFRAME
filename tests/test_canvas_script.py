@@ -10,8 +10,8 @@ import pytest
 
 
 def _load_script_module() -> ModuleType:
-    path = Path(__file__).parents[1] / "palantum" / "web" / "script.py"
-    spec = importlib.util.spec_from_file_location("palantum_canvas_script_tests", path)
+    path = Path(__file__).parents[1] / "pitchcraft" / "web" / "script.py"
+    spec = importlib.util.spec_from_file_location("pitchcraft_canvas_script_tests", path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"could not load {path}")
     module = importlib.util.module_from_spec(spec)
@@ -32,37 +32,37 @@ parse_canvas_beats = script_module.parse_canvas_beats
 
 def test_parse_canvas_beats_supports_numbered_headers_and_aliases() -> None:
     parsed = parse_canvas_beats(
-        "01 HOOK: Direkt starten.\n"
-        "02 PROBLEM\nZu viel Handarbeit.\n"
-        "03 LÖSUNG — Automatischer Schnitt.\n"
-        "04 DEMO / BEWEIS: Ein Klick zeigt das Ergebnis.\n"
-        "05 ZAHLEN: 12 Teams.\n"
-        "06 TEAM: Zwei Gründerinnen.\n"
-        "07 CTA: Heute testen."
+        "01 HOOK: Start directly.\n"
+        "02 PROBLEM\nToo much manual work.\n"
+        "03 SOLUTION — Automatic editing.\n"
+        "04 DEMO: One click shows the result.\n"
+        "05 TRACTION: 12 teams.\n"
+        "06 TEAM: Two founders.\n"
+        "07 CTA: Test today."
     )
 
     assert parsed == {
-        "HOOK": "Direkt starten.",
-        "PROBLEM": "Zu viel Handarbeit.",
-        "SOLUTION": "Automatischer Schnitt.",
-        "DEMO": "Ein Klick zeigt das Ergebnis.",
-        "TRACTION": "12 Teams.",
-        "TEAM": "Zwei Gründerinnen.",
-        "ASK": "Heute testen.",
+        "HOOK": "Start directly.",
+        "PROBLEM": "Too much manual work.",
+        "SOLUTION": "Automatic editing.",
+        "DEMO": "One click shows the result.",
+        "TRACTION": "12 teams.",
+        "TEAM": "Two founders.",
+        "ASK": "Test today.",
     }
-    assert parse_canvas_beats("Freier Pitchtext ohne Überschrift.")["HOOK"].startswith(
-        "Freier Pitchtext"
+    assert parse_canvas_beats("Free-form pitch text without a heading.")["HOOK"].startswith(
+        "Free-form pitch text"
     )
 
 
 def test_build_canvas_metadata_is_local_and_returns_isolated_defaults() -> None:
     with patch.object(script_module, "_call_devin") as call_devin:
-        first = build_canvas_metadata(text="HOOK: Ein klarer Einstieg.")
+        first = build_canvas_metadata(text="HOOK: A clear opening.")
         second = build_canvas_metadata()
 
     call_devin.assert_not_called()
-    first["beats"]["HOOK"] = "geändert"
-    first["beat_info"]["HOOK"]["title"] = "geändert"
+    first["beats"]["HOOK"] = "changed"
+    first["beat_info"]["HOOK"]["title"] = "changed"
     first["agent_cursors"][0]["beat"] = "ASK"
 
     assert second["beats"]["HOOK"] == ""
@@ -79,29 +79,29 @@ def test_canvas_improvements_and_generated_scripts_are_requested_in_english() ->
 
 
 def test_orchestrate_canvas_uses_one_devin_call_and_normalizes_ghosts() -> None:
-    text = "Wir schneiden Videos. Teams sparen Zeit."
+    text = "We edit videos. Teams save time."
     output = {
         "agents": [
             {
                 "agent": "A1",
                 "beat": "ASK",
-                "anchor_text": "Zeit.",
-                "message": "  Schließe   konkret. ",
-                "ghost_text": " beginne heute. ",
+                "anchor_text": "time.",
+                "message": "   Close   with specifics. ",
+                "ghost_text": " start today. ",
             },
             {
                 "agent": "A3",
                 "beat": "TRACTION",
                 "anchor_text": "Teams",
-                "message": "Belege den Zeitgewinn.",
-                "ghost_text": " Schon   verwendet. ",
+                "message": "Substantiate the time savings.",
+                "ghost_text": " Already   used. ",
             },
             {
                 "agent": "A2",
                 "beat": "HOOK",
-                "anchor_text": "Wir schneiden",
-                "message": "Zeige das Ergebnis zuerst.",
-                "ghost_text": "Schneiden mit KI.",
+                "anchor_text": "We edit",
+                "message": "Show the result first.",
+                "ghost_text": "Edit with AI.",
             },
         ]
     }
@@ -116,7 +116,7 @@ def test_orchestrate_canvas_uses_one_devin_call_and_normalizes_ghosts() -> None:
         result = orchestrate_canvas(
             text,
             cursor_offset=len(text),
-            accepted_ghost_texts=[" Schon verwendet. ", "SCHON   VERWENDET."],
+            accepted_ghost_texts=[" Already used. ", "ALREADY   USED."],
             request_id="request-7",
         )
 
@@ -125,15 +125,15 @@ def test_orchestrate_canvas_uses_one_devin_call_and_normalizes_ghosts() -> None:
     assert role_id == "CANVAS"
     assert context["request_id"] == "request-7"
     assert context["cursor_offset"] == len(text)
-    assert context["accepted_ghost_texts"] == ["Schon verwendet."]
+    assert context["accepted_ghost_texts"] == ["Already used."]
     assert schema["properties"]["agents"]["minItems"] == 3
     assert result["request_id"] == "request-7"
     assert result["session_id"] == "session-1"
     assert [item["agent"] for item in result["agents"]] == ["A2", "A3", "A1"]
-    assert result["agents"][0]["ghost_text"] == "mit KI."
+    assert result["agents"][0]["ghost_text"] == "with AI."
     assert result["agents"][1]["ghost_text"] == ""
-    assert result["agents"][2]["ghost_text"] == "Beginne heute."
-    assert result["agents"][2]["message"] == "Schließe konkret."
+    assert result["agents"][2]["ghost_text"] == "Start today."
+    assert result["agents"][2]["message"] == "Close with specifics."
 
 
 def test_orchestrate_canvas_rejects_non_verbatim_anchor() -> None:
@@ -142,8 +142,8 @@ def test_orchestrate_canvas_rejects_non_verbatim_anchor() -> None:
             {
                 "agent": agent,
                 "beat": beat,
-                "anchor_text": "nicht im Canvas",
-                "message": "Hinweis",
+                "anchor_text": "not in the canvas",
+                "message": "Note",
                 "ghost_text": "",
             }
             for agent, beat in (("A2", "HOOK"), ("A3", "PROBLEM"), ("A1", "ASK"))
@@ -158,16 +158,16 @@ def test_orchestrate_canvas_rejects_non_verbatim_anchor() -> None:
         ),
         pytest.raises(CanvasAgentResponseError, match="verbatim substring"),
     ):
-        orchestrate_canvas("Dieser Text hat einen gültigen Inhalt.")
+        orchestrate_canvas("This text has valid content.")
 
 
 def test_assist_canvas_agent_returns_only_the_json_contract() -> None:
     output = {
         "agent": "A3",
-        "beat": "ZAHLEN",
-        "anchor_text": "Teams",
-        "message": "Nenne einen belegten Zeitraum.",
-        "ghost_text": "Teams Sparen täglich Zeit",
+        "beat": "TRACTION",
+        "anchor_text": "teams",
+        "message": "Name a substantiated time period.",
+        "ghost_text": "Teams save time every day",
     }
     with (
         patch.dict("os.environ", {"DEVIN_API_KEY": "test-token"}, clear=True),
@@ -179,7 +179,7 @@ def test_assist_canvas_agent_returns_only_the_json_contract() -> None:
     ):
         result = assist_canvas_agent(
             "a3",
-            "Unsere Plattform hilft Teams",
+            "Our platform helps teams",
             beat="traction",
             request_id="assist-1",
         )
@@ -187,9 +187,9 @@ def test_assist_canvas_agent_returns_only_the_json_contract() -> None:
     assert result == {
         "agent": "A3",
         "beat": "TRACTION",
-        "anchor_text": "Teams",
-        "message": "Nenne einen belegten Zeitraum.",
-        "ghost_text": "sparen täglich Zeit",
+        "anchor_text": "teams",
+        "message": "Name a substantiated time period.",
+        "ghost_text": "save time every day",
     }
 
 
@@ -198,14 +198,14 @@ def test_missing_or_unreachable_devin_raises_typed_unavailable_error() -> None:
         patch.dict("os.environ", {}, clear=True),
         pytest.raises(CanvasAgentUnavailableError, match="not configured"),
     ):
-        orchestrate_canvas("Ein ausreichend langer Canvastext.")
+        orchestrate_canvas("A sufficiently long canvas text.")
 
     with (
         patch.dict("os.environ", {"DEVIN_API_KEY": "test-token"}, clear=True),
         patch.object(script_module, "_call_devin", side_effect=TimeoutError("too slow")),
         pytest.raises(CanvasAgentUnavailableError, match="too slow"),
     ):
-        orchestrate_canvas("Ein ausreichend langer Canvastext.")
+        orchestrate_canvas("A sufficiently long canvas text.")
 
 
 def test_create_script_stream_is_devin_only() -> None:
@@ -215,13 +215,13 @@ def test_create_script_stream_is_devin_only() -> None:
             script_module,
             "_call_devin",
             return_value=(
-                {"script": "HOOK\nDirekter Einstieg.\n\nASK\nHeute testen."},
+                {"script": "HOOK\nDirect opening.\n\nASK\nTest today."},
                 "session-3",
                 "https://example.test/session-3",
             ),
         ),
     ):
-        chunks, source = create_script_stream("Ein Videoschnittprodukt")
+        chunks, source = create_script_stream("A video editing product")
 
     assert source == "devin"
-    assert "Direkter Einstieg" in "".join(chunks)
+    assert "Direct opening" in "".join(chunks)

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 
-from palantum.orchestrator import (
+from pitchcraft.orchestrator import (
     _alpha_coverage,
     _cached_role,
     _graphics_overlays,
@@ -125,7 +126,7 @@ def test_alpha_coverage_samples_three_points(tmp_path: Path) -> None:
     output = tmp_path / "overlay.mov"
     output.write_bytes(b"mov")
     completed = type("Completed", (), {"stdout": "lavfi.signalstats.YAVG=63.75", "stderr": ""})()
-    with patch("palantum.orchestrator.subprocess.run", return_value=completed) as run:
+    with patch("pitchcraft.orchestrator.subprocess.run", return_value=completed) as run:
         assert _alpha_coverage(output, 4.0) == pytest.approx(0.25)
 
     assert run.call_count == 3
@@ -151,9 +152,9 @@ def test_opaque_unknown_scene_is_rerendered_as_inset(tmp_path: Path) -> None:
         },
     }
     with (
-        patch("palantum.orchestrator.materialize_scene", return_value=slot) as materialize,
-        patch("palantum.orchestrator._alpha_coverage", side_effect=[1.0, 0.2]),
-        patch("palantum.orchestrator.subprocess.run"),
+        patch("pitchcraft.orchestrator.materialize_scene", return_value=slot) as materialize,
+        patch("pitchcraft.orchestrator._alpha_coverage", side_effect=[1.0, 0.2]),
+        patch("pitchcraft.orchestrator.subprocess.run"),
     ):
         result = _render_motion_job(
             tmp_path / "edit", source, overlay, {}, (1920, 1080), resume=False
@@ -211,7 +212,7 @@ def test_graphics_director_runs_parallel_slot_workers_and_returns_edl_entries(
             "reason": "best take",
         }
     ]
-    plan = {
+    plan: dict[str, object] = {
         "overlays": [
             {
                 "slot_id": "problem-01",
@@ -244,9 +245,9 @@ def test_graphics_director_runs_parallel_slot_workers_and_returns_edl_entries(
         "beat": "PROBLEM",
     }
     with (
-        patch("palantum.orchestrator.build_scene_catalog") as build_catalog,
-        patch("palantum.orchestrator.run_role", side_effect=run) as roles,
-        patch("palantum.orchestrator._render_motion_job", return_value=rendered) as render,
+        patch("pitchcraft.orchestrator.build_scene_catalog") as build_catalog,
+        patch("pitchcraft.orchestrator.run_role", side_effect=run) as roles,
+        patch("pitchcraft.orchestrator._render_motion_job", return_value=rendered) as render,
     ):
         result = _graphics_overlays(
             tmp_path / "edit",
@@ -268,7 +269,7 @@ def test_graphics_overlays_skip_motion_when_no_scene_is_approved(tmp_path: Path)
     source = tmp_path / "templates.zip"
     source.write_bytes(b"fixture")
 
-    with patch("palantum.orchestrator.run_role") as roles:
+    with patch("pitchcraft.orchestrator.run_role") as roles:
         result = _graphics_overlays(
             tmp_path / "edit",
             {"brand": {}},
@@ -330,7 +331,7 @@ def test_numeric_scene_is_rejected_for_non_numeric_quote(tmp_path: Path) -> None
     }
 
     with (
-        patch("palantum.orchestrator.run_role") as roles,
+        patch("pitchcraft.orchestrator.run_role") as roles,
         pytest.raises(RuntimeError, match="no usable scene"),
     ):
         _graphics_overlays(
@@ -365,7 +366,7 @@ def test_invalid_worker_props_are_retried_once(tmp_path: Path) -> None:
             {"key": "bgColor", "max_chars": 32, "default": "#FDD835"},
         ],
     }
-    plan = {
+    plan: dict[str, object] = {
         "overlays": [
             {
                 "slot_id": "problem-01",
@@ -378,7 +379,7 @@ def test_invalid_worker_props_are_retried_once(tmp_path: Path) -> None:
             }
         ]
     }
-    worker_results = iter(
+    worker_results: Any = iter(
         [
             {
                 "slot_id": "problem-01",
@@ -407,8 +408,8 @@ def test_invalid_worker_props_are_retried_once(tmp_path: Path) -> None:
         "beat": "PROBLEM",
     }
     with (
-        patch("palantum.orchestrator.run_role", side_effect=run) as roles,
-        patch("palantum.orchestrator._render_motion_job", return_value=rendered) as render,
+        patch("pitchcraft.orchestrator.run_role", side_effect=run) as roles,
+        patch("pitchcraft.orchestrator._render_motion_job", return_value=rendered) as render,
     ):
         result = _graphics_overlays(
             tmp_path / "edit",
@@ -451,10 +452,10 @@ def test_npm_install_uses_windows_command_launcher() -> None:
 
 
 def test_role_cache_resumes_without_calling_backend(tmp_path: Path) -> None:
-    with patch("palantum.orchestrator.run_role", return_value={"ranges": []}) as run:
+    with patch("pitchcraft.orchestrator.run_role", return_value={"ranges": []}) as run:
         assert _cached_role(tmp_path, "A4", "A4", "prompt", {}, resume=False) == {"ranges": []}
     run.assert_called_once()
 
-    with patch("palantum.orchestrator.run_role") as run:
+    with patch("pitchcraft.orchestrator.run_role") as run:
         assert _cached_role(tmp_path, "A4", "A4", "prompt", {}, resume=True) == {"ranges": []}
     run.assert_not_called()

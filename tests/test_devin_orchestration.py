@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from palantum.web.app import create_app
-from palantum.web.script import CanvasAgentUnavailableError
+from pitchcraft.web.app import create_app
+from pitchcraft.web.script import CanvasAgentUnavailableError
 
 
 def test_devin_config_endpoint_is_read_only(tmp_path: Path) -> None:
@@ -30,32 +30,32 @@ def test_devin_orchestrate_endpoint_evaluates_beats_and_ghost_text(tmp_path: Pat
                 "agent": "A2",
                 "beat": "HOOK",
                 "anchor_text": "Hallo",
-                "message": "Starte mit dem Nutzen.",
-                "ghost_text": "Zwei Stunden Schnitt werden zu zwei Minuten.",
+                "message": "Start with the value.",
+                "ghost_text": "Two hours of editing become two minutes.",
             },
             {
                 "agent": "A3",
                 "beat": "TRACTION",
                 "anchor_text": "Entwickler",
-                "message": "Belege den Nutzen.",
+                "message": "Substantiate the value.",
                 "ghost_text": "",
             },
             {
                 "agent": "A1",
                 "beat": "ASK",
-                "anchor_text": "Videoschnitt",
-                "message": "Ergänze einen CTA.",
-                "ghost_text": "Teste jetzt die Beta.",
+                "anchor_text": "video editing",
+                "message": "Add a CTA.",
+                "ghost_text": "Test the beta now.",
             },
         ],
     }
-    with patch("palantum.web.app.orchestrate_canvas", return_value=result) as orchestrate:
+    with patch("pitchcraft.web.app.orchestrate_canvas", return_value=result) as orchestrate:
         res = client.post(
             "/api/devin/orchestrate",
             json={
-                "text": "Hallo, wir bauen automatisierten Videoschnitt für Entwickler.",
+                "text": "Hello, we are building automated video editing for developers.",
                 "cursor_offset": 15,
-                "accepted_ghost_texts": ["Schon verwendet"],
+                "accepted_ghost_texts": ["Already used"],
                 "request_id": "orch-1",
             },
         )
@@ -64,40 +64,40 @@ def test_devin_orchestrate_endpoint_evaluates_beats_and_ghost_text(tmp_path: Pat
     assert data["request_id"] == "orch-1"
     assert [item["agent"] for item in data["agents"]] == ["A2", "A3", "A1"]
     orchestrate.assert_called_once_with(
-        "Hallo, wir bauen automatisierten Videoschnitt für Entwickler.",
+        "Hello, we are building automated video editing for developers.",
         cursor_offset=15,
-        accepted_ghost_texts=["Schon verwendet"],
+        accepted_ghost_texts=["Already used"],
         request_id="orch-1",
     )
 
 
 def test_missing_devin_disables_agents_without_blocking_canvas(tmp_path: Path) -> None:
     client = TestClient(create_app(tmp_path))
-    saved = client.post("/api/canvas", json={"text": "Mein Pitch bleibt gespeichert."})
+    saved = client.post("/api/canvas", json={"text": "My pitch remains saved."})
     assert saved.status_code == 200
 
     with patch(
-        "palantum.web.app.orchestrate_canvas",
-        side_effect=CanvasAgentUnavailableError("Devin ist nicht konfiguriert."),
+        "pitchcraft.web.app.orchestrate_canvas",
+        side_effect=CanvasAgentUnavailableError("Devin is not configured."),
     ):
         response = client.post(
             "/api/devin/orchestrate",
-            json={"text": "Mein Pitch bleibt gespeichert.", "request_id": "offline-1"},
+            json={"text": "My pitch remains saved.", "request_id": "offline-1"},
         )
 
     assert response.status_code == 503
-    assert client.get("/api/canvas").json()["text"] == "Mein Pitch bleibt gespeichert."
+    assert client.get("/api/canvas").json()["text"] == "My pitch remains saved."
 
 
 def test_invalid_orchestration_request_maps_to_422(tmp_path: Path) -> None:
     client = TestClient(create_app(tmp_path))
     with patch(
-        "palantum.web.app.orchestrate_canvas",
+        "pitchcraft.web.app.orchestrate_canvas",
         side_effect=ValueError("request_id must not be blank"),
     ):
         response = client.post(
             "/api/devin/orchestrate",
-            json={"text": "Ein gültiger Pitch", "request_id": " "},
+            json={"text": "A valid pitch", "request_id": " "},
         )
 
     assert response.status_code == 422
@@ -107,12 +107,12 @@ def test_invalid_orchestration_request_maps_to_422(tmp_path: Path) -> None:
 def test_invalid_assist_agent_maps_to_422(tmp_path: Path) -> None:
     client = TestClient(create_app(tmp_path))
     with patch(
-        "palantum.web.app.assist_canvas_agent",
+        "pitchcraft.web.app.assist_canvas_agent",
         side_effect=ValueError("unsupported canvas agent: A9"),
     ):
         response = client.post(
             "/api/canvas/assist",
-            json={"text": "Ein gültiger Pitch", "agent_id": "A9"},
+            json={"text": "A valid pitch", "agent_id": "A9"},
         )
 
     assert response.status_code == 422

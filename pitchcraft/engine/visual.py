@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import TypedDict, cast
 
-from palantum.engine.videouse import probe
+from pitchcraft.engine.videouse import probe
 
 
 class VisualBlock(TypedDict, total=False):
@@ -25,7 +25,7 @@ def _fallback(error: str) -> VisualBlock:
     return {
         "kind": "unknown",
         "has_ui": False,
-        "description": "Visuelle Klassifizierung nicht verfügbar.",
+        "description": "Visual classification is unavailable.",
         "error": error,
     }
 
@@ -64,8 +64,8 @@ def _classify(frames: list[Path]) -> VisualBlock:
         "kind": "unknown",
         "has_ui": False,
         "description": (
-            "Lokale Frames wurden extrahiert; eine semantische "
-            "Bildklassifizierung ist nicht aktiviert."
+            "Local frames were extracted; semantic "
+            "image classification is not enabled."
         ),
     }
 
@@ -88,7 +88,7 @@ def classify_visual(source: Path, edit_dir: Path, frame_count: int = 5) -> Visua
         duration = probe(source).duration_s
         count = max(1, frame_count)
         timestamps = [duration * (index + 1) / (count + 1) for index in range(count)]
-        with tempfile.TemporaryDirectory(prefix="palantum-visual-") as directory:
+        with tempfile.TemporaryDirectory(prefix="pitchcraft-visual-") as directory:
             frames = []
             for index, timestamp in enumerate(timestamps):
                 path = Path(directory) / f"frame-{index:02d}.png"

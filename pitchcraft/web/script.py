@@ -88,18 +88,12 @@ _AGENT_ROLES = {
     "A1": "Supervisor",
 }
 _BEAT_ALIASES = {
-    "LÖSUNG": "SOLUTION",
-    "LOESUNG": "SOLUTION",
-    "BEWEIS": "DEMO",
-    "ZAHLEN": "TRACTION",
     "CTA": "ASK",
 }
 _BEAT_HEADER = re.compile(
     r"^(?:(?:0?[1-7])(?:[.)]|\s*[-:])?\s+)?"
-    r"\[?(?P<beat>HOOK|PROBLEM|SOLUTION|LÖSUNG|LOESUNG|DEMO|BEWEIS|"
-    r"TRACTION|ZAHLEN|TEAM|ASK|CTA)\]?"
-    r"(?:\s*/\s*(?:HOOK|PROBLEM|SOLUTION|LÖSUNG|LOESUNG|DEMO|BEWEIS|"
-    r"TRACTION|ZAHLEN|TEAM|ASK|CTA))?"
+    r"\[?(?P<beat>HOOK|PROBLEM|SOLUTION|DEMO|TRACTION|TEAM|ASK|CTA)\]?"
+    r"(?:\s*/\s*(?:HOOK|PROBLEM|SOLUTION|DEMO|TRACTION|TEAM|ASK|CTA))?"
     r"(?:\s*[:—-]\s*|\s+|$)(?P<body>.*)$",
     re.IGNORECASE,
 )
@@ -177,7 +171,7 @@ SCRIPT_SCHEMA: dict[str, Any] = {
     "properties": {"script": {"type": "string", "minLength": 1}},
 }
 
-_ORCHESTRATION_PROMPT = """You are the Palantum canvas orchestrator. In one response, provide
+_ORCHESTRATION_PROMPT = """You are the PitchCraft canvas orchestrator. In one response, provide
 one independent contribution from each of these three agents: A2 Director, A3 Strategist, and
 A1 Supervisor. A2 improves the hook and visual direction; A3 challenges the problem, solution,
 and evidence; A1 protects timing, clarity, and the final call to action.
@@ -190,14 +184,14 @@ accepted_ghost_texts. Continue an unfinished sentence with matching grammar and 
 sentence-ending punctuation, begin a new sentence. Always write message and ghost_text in English,
 even when the input uses another language. Never invent metrics, customers, or facts."""
 
-_ASSIST_PROMPT = """Act only as the requested Palantum canvas agent and return the requested
+_ASSIST_PROMPT = """Act only as the requested PitchCraft canvas agent and return the requested
 JSON object. anchor_text must be a non-empty, case-sensitive, verbatim substring of INPUT
 JSON.text. Keep message concise. ghost_text, when non-empty, must be wording that can be inserted
 immediately after anchor_text without repeating current or accepted text. Preserve grammatical
 continuation. Always write message and ghost_text in English, even when the input uses another
 language. Never invent metrics, customers, or facts."""
 
-_SCRIPT_PROMPT = """You are Palantum's A1 Script Supervisor. Turn the supplied description into
+_SCRIPT_PROMPT = """You are PitchCraft's A1 Script Supervisor. Turn the supplied description into
 a concise, speakable startup video script of about 60 seconds. Use HOOK, PROBLEM, SOLUTION, DEMO,
 TRACTION, TEAM, and ASK sections. Do not invent numbers, customers, results, or product features;
 mark genuinely missing facts briefly in square brackets. Write the complete script in English,
@@ -402,7 +396,7 @@ def _call_devin(
     context: dict[str, Any],
     schema: dict[str, Any],
 ) -> tuple[dict[str, Any], str, str]:
-    from palantum.agents.backends.devin import call
+    from pitchcraft.agents.backends.devin import call
 
     result = call(role_id, prompt, context, schema)
     return result.output, result.session_id, result.url

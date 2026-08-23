@@ -4,10 +4,10 @@ import argparse
 import json
 from pathlib import Path
 
-from palantum.engine.videouse import doctor
-from palantum.export import export_project
-from palantum.orchestrator import _schema, analyze, cut, gate
-from palantum.state import load
+from pitchcraft.engine.videouse import doctor
+from pitchcraft.export import export_project
+from pitchcraft.orchestrator import _schema, analyze, cut, gate
+from pitchcraft.state import load
 
 BEATS = ("HOOK", "PROBLEM", "SOLUTION", "DEMO", "TRACTION", "TEAM", "ASK")
 ANSI_BOLD = "\033[1m"
@@ -62,7 +62,7 @@ def print_state(state: dict[str, object]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="palantum")
+    parser = argparse.ArgumentParser(prog="pitchcraft")
     parser.add_argument("--videos-dir", type=Path, default=Path("."))
     commands = parser.add_subparsers(dest="command", required=True)
     ingest = commands.add_parser("ingest")
@@ -125,7 +125,7 @@ def main() -> None:
     if args.command == "serve":
         import uvicorn
 
-        from palantum.web import create_app
+        from pitchcraft.web import create_app
 
         uvicorn.run(
             create_app(videos_dir, args.template_source), host=args.host, port=args.port

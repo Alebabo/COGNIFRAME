@@ -33,7 +33,7 @@ def empty_state(schema: dict[str, Any]) -> dict[str, Any]:
                 "source": None,
                 "range": None,
                 "owner": "A2",
-                "reason": "Noch kein Material analysiert.",
+                "reason": "No footage has been analyzed yet.",
             }
             for b in schema["beats"]
         ],

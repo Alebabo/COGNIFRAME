@@ -5,28 +5,28 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from palantum.web.app import create_app
-from palantum.web.script import parse_canvas_beats
+from pitchcraft.web.app import create_app
+from pitchcraft.web.script import parse_canvas_beats
 
 
 def test_parse_canvas_beats_structured_and_unstructured() -> None:
     structured = (
-        "01 HOOK: Zwei Stunden werden zu zwei Minuten.\n"
-        "02 PROBLEM: Entwickler verlieren viel Zeit mit flakigen Tests.\n"
-        "03 SOLUTION: Automatische Isolation der Ursache.\n"
-        "04 DEMO: Ein Klick öffnet den Fix.\n"
-        "05 TRACTION: 120 Teams in 3 Monaten.\n"
-        "06 TEAM: 6 Jahre Google & Stripe.\n"
-        "07 ASK: Teste die Beta auf palantum.dev."
+        "01 HOOK: Two hours become two minutes.\n"
+        "02 PROBLEM: Developers lose a lot of time to flaky tests.\n"
+        "03 SOLUTION: Automatic isolation of the root cause.\n"
+        "04 DEMO: One click opens the fix.\n"
+        "05 TRACTION: 120 Teams in 3 months.\n"
+        "06 TEAM: 6 years at Google & Stripe.\n"
+        "07 ASK: Test the beta at pitchcraft.dev."
     )
     parsed = parse_canvas_beats(structured)
-    assert "Zwei Stunden" in parsed["HOOK"]
-    assert "Entwickler verlieren" in parsed["PROBLEM"]
-    assert "Automatische Isolation" in parsed["SOLUTION"]
-    assert "Ein Klick" in parsed["DEMO"]
+    assert "Two hours" in parsed["HOOK"]
+    assert "Developers lose" in parsed["PROBLEM"]
+    assert "Automatic isolation" in parsed["SOLUTION"]
+    assert "One click" in parsed["DEMO"]
     assert "120 Teams" in parsed["TRACTION"]
     assert "Google & Stripe" in parsed["TEAM"]
-    assert "palantum.dev" in parsed["ASK"]
+    assert "pitchcraft.dev" in parsed["ASK"]
 
 
 def test_canvas_get_and_post_endpoints(tmp_path: Path) -> None:
@@ -44,19 +44,19 @@ def test_canvas_get_and_post_endpoints(tmp_path: Path) -> None:
     update_payload = {
         "title": "SuperPitch AI",
         "beats": {
-            "HOOK": "Zwei Stunden Test-Triage werden zu zwei Minuten.",
-            "PROBLEM": "Entwickler verlieren wertvolle Zeit.",
+            "HOOK": "Two hours of test triage become two minutes.",
+            "PROBLEM": "Developers lose valuable time.",
         },
         "attached_videos": {
             "HOOK": "take_1.mp4",
         },
     }
-    with patch("palantum.web.app.orchestrate_canvas") as orchestrate:
+    with patch("pitchcraft.web.app.orchestrate_canvas") as orchestrate:
         res2 = client.post("/api/canvas", json=update_payload)
     assert res2.status_code == 200
     updated_data = res2.json()
     assert updated_data["title"] == "SuperPitch AI"
-    assert "Zwei Stunden" in updated_data["beats"]["HOOK"]
+    assert "Two hours" in updated_data["beats"]["HOOK"]
     assert updated_data["attached_videos"]["HOOK"] == "take_1.mp4"
     orchestrate.assert_not_called()
     assert not list((tmp_path / "edit").glob("canvas.json.tmp"))
@@ -68,7 +68,7 @@ def test_canvas_text_parsing_wins_over_stale_frontend_beats(tmp_path: Path) -> N
     response = client.post(
         "/api/canvas",
         json={
-            "text": "01 HOOK: Der neu geschriebene Einstieg.\n07 ASK: Jetzt testen.",
+            "text": "01 HOOK: The newly written opening.\n07 ASK: Test it now.",
             "beats": {
                 "HOOK": "",
                 "PROBLEM": "veraltet",
@@ -83,28 +83,28 @@ def test_canvas_text_parsing_wins_over_stale_frontend_beats(tmp_path: Path) -> N
     )
 
     assert response.status_code == 200
-    assert response.json()["beats"]["HOOK"] == "Der neu geschriebene Einstieg."
-    assert response.json()["beats"]["ASK"] == "Jetzt testen."
+    assert response.json()["beats"]["HOOK"] == "The newly written opening."
+    assert response.json()["beats"]["ASK"] == "Test it now."
     assert response.json()["beats"]["PROBLEM"] == ""
 
 
 def test_canvas_assist_endpoint_returns_structured_devin_response(tmp_path: Path) -> None:
     client = TestClient(create_app(tmp_path))
     with patch(
-        "palantum.web.app.assist_canvas_agent",
+        "pitchcraft.web.app.assist_canvas_agent",
         return_value={
             "request_id": "assist-1",
             "agent": "A3",
             "beat": "TRACTION",
-            "anchor_text": "viele Kunden",
-            "message": "Präzisiere die Zahlen mit Zeitbezug.",
-            "ghost_text": " in den letzten drei Monaten",
+                "anchor_text": "many customers",
+            "message": "Add a clear time reference to the numbers.",
+            "ghost_text": " in the last three months",
         },
     ) as assist:
         res = client.post(
             "/api/canvas/assist",
             json={
-                "text": "Wir haben viele Kunden",
+                "text": "We have many customers",
                 "beat": "TRACTION",
                 "agent_id": "A3",
                 "cursor_offset": 21,
@@ -113,10 +113,10 @@ def test_canvas_assist_endpoint_returns_structured_devin_response(tmp_path: Path
             },
         )
     assert res.status_code == 200
-    assert res.json()["ghost_text"] == " in den letzten drei Monaten"
+    assert res.json()["ghost_text"] == " in the last three months"
     assist.assert_called_once_with(
         "A3",
-        "Wir haben viele Kunden",
+        "We have many customers",
         beat="TRACTION",
         cursor_offset=21,
         accepted_ghost_texts=[],
@@ -126,11 +126,11 @@ def test_canvas_assist_endpoint_returns_structured_devin_response(tmp_path: Path
 
 def test_upload_with_beat_association(tmp_path: Path) -> None:
     client = TestClient(create_app(tmp_path))
-    with patch("palantum.web.app._EXECUTOR.submit"):
+    with patch("pitchcraft.web.app._EXECUTOR.submit"):
         res = client.post(
             "/api/upload",
             files={"files": ("demo_clip.mp4", b"fake video content", "video/mp4")},
-            data={"beat": "DEMO", "brief": "Mein Pitch"},
+            data={"beat": "DEMO", "brief": "My pitch"},
         )
     assert res.status_code == 200
     assert res.json()["beat"] == "DEMO"
@@ -149,7 +149,7 @@ def test_corrupt_canvas_is_reported_without_overwriting_it(tmp_path: Path) -> No
     client = TestClient(create_app(tmp_path))
 
     read = client.get("/api/canvas")
-    write = client.post("/api/canvas", json={"text": "Nicht überschreiben"})
+    write = client.post("/api/canvas", json={"text": "Do not overwrite"})
 
     assert read.status_code == 500
     assert write.status_code == 500

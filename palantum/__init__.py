@@ -1,1 +1,0 @@
-"""Palantum director layer."""

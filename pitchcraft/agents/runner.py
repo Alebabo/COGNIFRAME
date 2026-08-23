@@ -96,12 +96,12 @@ def run_role(
 ) -> dict[str, Any]:
     """Run one role with one backend, validating and retrying once."""
     selected = schema or _schema(role_id)
-    backend = os.getenv("PALANTUM_AGENT_BACKEND", "devin").lower()
+    backend = os.getenv("PITCHCRAFT_AGENT_BACKEND", "devin").lower()
     if backend != "devin":
-        raise ValueError("Palantum agent roles require the Devin backend")
+        raise ValueError("PitchCraft agent roles require the Devin backend")
 
     if max_feedback_rounds not in {0, 1}:
-        raise ValueError("Palantum supports at most one autonomous feedback round")
+        raise ValueError("PitchCraft supports at most one autonomous feedback round")
 
     last_error = ""
     session_url: str | None = None
@@ -113,7 +113,7 @@ def run_role(
         if last_error:
             attempt_context["_validation_error"] = last_error
         try:
-            from palantum.agents.backends.devin import call as call_devin
+            from pitchcraft.agents.backends.devin import call as call_devin
 
             def session_created(_session_id: str, url: str) -> None:
                 nonlocal session_url
@@ -154,7 +154,7 @@ def run_role(
         }
         _record_session(context, role_id, "revising", session_url, reasoning_details)
         try:
-            from palantum.agents.backends.devin import continue_session
+            from pitchcraft.agents.backends.devin import continue_session
 
             result = continue_session(
                 role_id,

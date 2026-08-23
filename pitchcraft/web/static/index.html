@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PitchCraft</title>
-<link rel="icon" href="palantum-logo.png" type="image/png">
+<link rel="icon" href="pitchcraft-logo.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1024,7 +1024,7 @@
 
 <header class="topbar">
   <div class="brand" aria-label="PitchCraft home">
-    <img class="brand-logo" src="palantum-logo.png" alt="PitchCraft">
+    <img class="brand-logo" src="pitchcraft-logo.png" alt="PitchCraft">
   </div>
   <div class="agents-nav">
     <div class="avatar-stack" id="avatar-stack" aria-label="Director, Strategist, and Supervisor">
@@ -2067,7 +2067,7 @@ async function triggerAgenticOrchestration() {
     ? promptElement.selectionStart
     : promptElement.value.length;
   state.inflight = true;
-  beginCanvasAgentActivity(requestId, 'A2 Director hat die Canvas-Analyse gestartet.');
+  beginCanvasAgentActivity(requestId, 'A2 Director started canvas analysis.');
   renderAgentRecommendations();
 
   try {
@@ -2224,7 +2224,7 @@ async function generateScript() {
       body: JSON.stringify({ prompt }),
     });
     if (!response.ok || !response.body) throw new Error('The script could not be generated.');
-    const source = response.headers.get('X-Palantum-Generator');
+    const source = response.headers.get('X-Pitchcraft-Generator');
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     while (true) {

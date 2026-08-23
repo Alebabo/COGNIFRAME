@@ -240,7 +240,7 @@ At documentation audit time, `entire checkpoint list` reported 25 checkpoints on
 - `01M0PBFZNVRKHRYEQKEJS2AC9W` — A4 prompt budget, motion overlay QC, and safe environment launchers;
 - `01M0PD430R24XK43W30XZT642Y` — bounded Devin reasoning, motion pacing, and subtitle suppression;
 - `01M0PA0FGAZQSPSJA1RY0BA6B5` — live agent status notifications;
-- `01M0P6CAYGXVVRPX7Z05Q7ZC3Z` — unified Palantum/COGNIFRAME integration.
+- `01M0P6CAYGXVVRPX7Z05Q7ZC3Z` — unified PitchCraft/COGNIFRAME integration.
 
 The checkpoint trail is not decorative. It preserves the decisions behind the current constraints—for example why Version B still requires real motion after a full-bleed overlay bug, and why the A4 repair loop is capped at one round.
 
@@ -249,7 +249,7 @@ The checkpoint trail is not decorative. It preserves the decisions behind the cu
 ```bash
 uv run --no-env-file pytest
 uv run --no-env-file ruff check .
-uv run --no-env-file mypy palantum
+uv run --no-env-file mypy pitchcraft
 git diff --check
 ```
 

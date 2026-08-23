@@ -15,16 +15,16 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from palantum.export import export_project
-from palantum.orchestrator import (
+from pitchcraft.export import export_project
+from pitchcraft.orchestrator import (
     _schema,
     analyze,
     build_chunk_variants,
     finalize_chunk_variants,
     recommend_chunk_variants,
 )
-from palantum.state import load
-from palantum.web.script import (
+from pitchcraft.state import load
+from pitchcraft.web.script import (
     CanvasAgentResponseError,
     CanvasAgentSuggestion,
     CanvasAgentUnavailableError,
@@ -39,7 +39,7 @@ from palantum.web.script import (
 ROLE_NAMES = {
     "A1": "Script Supervisor",
     "A2": "Director",
-    "A3": "Stratege",
+    "A3": "Strategist",
     "A4": "Cutter",
     "A5": "Variant Supervisor",
     "A6": "Graphics Director",
@@ -569,7 +569,7 @@ def create_app(
     root = Path(videos_dir).resolve()
     resolved_template = Path(template_source).resolve() if template_source else None
     root.mkdir(parents=True, exist_ok=True)
-    app = FastAPI(title="Palantum")
+    app = FastAPI(title="PitchCraft")
 
     @app.exception_handler(CanvasPersistenceError)
     async def canvas_persistence_error(
@@ -673,7 +673,7 @@ def create_app(
                 status_code=503, detail="OPENAI_API_KEY is not configured for Whisper."
             )
         suffix = Path(file.filename or "").suffix
-        temporary = root / f".palantum-transcribe-{uuid.uuid4().hex}{suffix}"
+        temporary = root / f".pitchcraft-transcribe-{uuid.uuid4().hex}{suffix}"
         try:
             with temporary.open("wb") as handle:
                 while chunk := await file.read(1024 * 1024):
@@ -774,7 +774,7 @@ def create_app(
         return StreamingResponse(
             chunks,
             media_type="text/plain; charset=utf-8",
-            headers={"X-Palantum-Generator": generator},
+            headers={"X-Pitchcraft-Generator": generator},
         )
 
     @app.post("/api/chunks/{chunk_id}/selection")

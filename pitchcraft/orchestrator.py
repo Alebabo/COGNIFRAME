@@ -13,19 +13,19 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from palantum.agents.backends.devin import DEVIN_PROMPT_BUDGET_CHARS, serialize_prompt
-from palantum.agents.runner import run_role
-from palantum.engine.transcribe import transcribe
-from palantum.engine.videouse import (
+from pitchcraft.agents.backends.devin import DEVIN_PROMPT_BUDGET_CHARS, serialize_prompt
+from pitchcraft.agents.runner import run_role
+from pitchcraft.engine.transcribe import transcribe
+from pitchcraft.engine.videouse import (
     ProbeResult,
     pack_transcripts,
     probe,
     render,
     timeline_view,
 )
-from palantum.engine.visual import classify_visual
-from palantum.motion import build_render_command, build_scene_catalog, materialize_scene
-from palantum.state import coverage_score, load, save
+from pitchcraft.engine.visual import classify_visual
+from pitchcraft.motion import build_render_command, build_scene_catalog, materialize_scene
+from pitchcraft.state import coverage_score, load, save
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -355,7 +355,7 @@ def _debate(state: dict[str, Any], director: dict[str, Any], strategist: dict[st
                     "a2": director_beat["status"],
                     "a3": strategist_status,
                     "resolved": strategist_status,
-                    "rule": "A3 gewinnt bei Inhalt",
+                    "rule": "A3 wins on content",
                 }
             )
 
@@ -380,7 +380,7 @@ def _context(
 
 def _motion_source(explicit: Path | None, state: dict[str, Any]) -> Path | None:
     configured = explicit or (
-        Path(value) if (value := os.getenv("PALANTUM_TEMPLATE_SOURCE")) else None
+        Path(value) if (value := os.getenv("PITCHCRAFT_TEMPLATE_SOURCE")) else None
     )
     if configured is None and (saved := state.get("meta", {}).get("template_source")):
         configured = Path(str(saved))
@@ -809,7 +809,7 @@ def _render_motion_job(
     slot_id = str(overlay["slot_id"])
     existing_slot = edit_dir / "animations" / f"slot_{slot_id}"
     existing_output = existing_slot / "render.mov"
-    existing_manifest_path = existing_slot / "palantum-slot.json"
+    existing_manifest_path = existing_slot / "pitchcraft-slot.json"
     existing_presentation = None
     if existing_manifest_path.exists():
         with suppress(OSError, ValueError, json.JSONDecodeError):
@@ -994,7 +994,7 @@ _CHUNK_VARIANTS = (
     {
         "id": "a",
         "label": "Version A",
-        "name": "Clean Cut · ohne Motion Graphic",
+        "name": "Clean Cut · without motion graphics",
         "direction": (
             "Prioritize clarity, natural pauses, and the strongest complete delivery. "
             "Keep the pacing controlled, leave the speaker visually dominant, and use no "
@@ -1005,7 +1005,7 @@ _CHUNK_VARIANTS = (
     {
         "id": "b",
         "label": "Version B",
-        "name": "Motion Cut · eine Motion Graphic",
+        "name": "Motion Cut · one motion graphic",
         "direction": (
             "Build a tighter, more energetic alternative. Prefer concise phrasing and "
             "leave clean visual room for exactly one integrated motion graphic."
@@ -1581,7 +1581,7 @@ def _recommend_chunk_variant(
         return {
             "status": "unavailable",
             "variant_id": None,
-            "reason": "Die KI-Empfehlung ist derzeit nicht verfügbar.",
+            "reason": "The AI recommendation is currently unavailable.",
         }
 
 
@@ -1655,7 +1655,7 @@ def build_chunk_variants(
     motion_source = _motion_source(template_source, state)
     if motion_source is None:
         raise RuntimeError(
-            "PALANTUM_TEMPLATE_SOURCE fehlt; Variante B benötigt genau eine "
+            "PITCHCRAFT_TEMPLATE_SOURCE is missing; Variant B requires exactly one "
             "validierte Motion Graphic."
         )
     catalog_path = edit_dir / "scene-catalog.json"

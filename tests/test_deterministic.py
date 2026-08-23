@@ -3,17 +3,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 
-from palantum.cli import _confirm_rough_cut, _cut_sources
-from palantum.engine.transcribe import whisper_to_scribe
-from palantum.orchestrator import _apply_coverage, _audio_check, _debate, cut, gate
-from palantum.state import coverage_score, empty_state
+from pitchcraft.cli import _confirm_rough_cut, _cut_sources
+from pitchcraft.engine.transcribe import whisper_to_scribe
+from pitchcraft.orchestrator import _apply_coverage, _audio_check, _debate, cut, gate
+from pitchcraft.state import coverage_score, empty_state
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA = json.loads((ROOT / "palantum/schemas/yc_pitch_60s.json").read_text())
+SCHEMA = json.loads((ROOT / "pitchcraft/schemas/yc_pitch_60s.json").read_text())
 
 
 def test_coverage_score_weights_required_beats() -> None:
@@ -79,14 +80,14 @@ def test_forced_cut_skips_gate_and_motion_when_no_template_is_configured(
         return {"verdict": "pass", "findings": [{"check": "duration ≥ target"}]}
 
     with (
-        patch("palantum.orchestrator.load", return_value=state),
-        patch("palantum.orchestrator.run_role", side_effect=run),
-        patch("palantum.orchestrator._motion_source", return_value=None),
-        patch("palantum.orchestrator.probe", return_value=probe_result),
-        patch("palantum.orchestrator.render"),
-        patch("palantum.orchestrator._probe_context", return_value={}),
-        patch("palantum.orchestrator._timeline_views", return_value=[]),
-        patch("palantum.orchestrator._audio_check", return_value={}),
+        patch("pitchcraft.orchestrator.load", return_value=state),
+        patch("pitchcraft.orchestrator.run_role", side_effect=run),
+        patch("pitchcraft.orchestrator._motion_source", return_value=None),
+        patch("pitchcraft.orchestrator.probe", return_value=probe_result),
+        patch("pitchcraft.orchestrator.render"),
+        patch("pitchcraft.orchestrator._probe_context", return_value={}),
+        patch("pitchcraft.orchestrator._timeline_views", return_value=[]),
+        patch("pitchcraft.orchestrator._audio_check", return_value={}),
     ):
         edl, qc = cut(tmp_path, [source], force=True)
 
@@ -98,14 +99,14 @@ def test_forced_cut_skips_gate_and_motion_when_no_template_is_configured(
 
 def test_whisper_adapter_inserts_spacing_and_constant_speaker() -> None:
     fixture = json.loads((ROOT / "tests/fixtures/whisper_verbose.json").read_text())
-    result = whisper_to_scribe(fixture)
+    result: Any = whisper_to_scribe(fixture)
     assert [item["type"] for item in result["words"]] == ["word", "spacing", "word"]
     assert result["words"][1]["start"] == 0.4
     assert result["words"][1]["end"] == 1.0
     assert {item["speaker_id"] for item in result["words"]} == {"speaker_0"}
 
 
-def test_audio_check_reports_loud_and_silent_segments(tmp_path: Path, monkeypatch: object) -> None:
+def test_audio_check_reports_loud_and_silent_segments(tmp_path: Path, monkeypatch: Any) -> None:
     class Completed:
         stderr = "mean_volume: -14.0 dB\nmax_volume: -1.0 dB\n"
 
@@ -119,7 +120,7 @@ def test_audio_check_reports_loud_and_silent_segments(tmp_path: Path, monkeypatc
             result.stderr = "mean_volume: -100.0 dB\nmax_volume: -100.0 dB\n"
         return result
 
-    monkeypatch.setattr("palantum.orchestrator.subprocess.run", run)
+    monkeypatch.setattr("pitchcraft.orchestrator.subprocess.run", run)
     result = _audio_check(
         tmp_path / "final.mp4",
         [
@@ -193,7 +194,7 @@ def test_resolved_note_is_preserved_with_closing_source() -> None:
         "beat_order": [beat["id"] for beat in SCHEMA["beats"]],
         "order_reason": "schema",
     }
-    strategist = {"rulings": [], "content_findings": []}
+    strategist: dict[str, Any] = {"rulings": [], "content_findings": []}
     _apply_coverage(state, director, strategist, SCHEMA)
     assert state["resolved_notes"][0]["beat"] == "TRACTION"
     assert state["resolved_notes"][0]["closed_by"] == "take_traction"

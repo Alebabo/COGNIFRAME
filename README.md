@@ -150,11 +150,11 @@ Demo inputs and the licensed external motion pack are intentionally not redistri
 
 ## Setup
 
-Prerequisites: Python 3.11+, `uv`, FFmpeg/ffprobe, Node/npm, and credentials for Devin and Whisper. Motion Version B also needs a local `PALANTUM_TEMPLATE_SOURCE`.
+Prerequisites: Python 3.11+, `uv`, FFmpeg/ffprobe, Node/npm, and credentials for Devin and Whisper. Motion Version B also needs a local `PITCHCRAFT_TEMPLATE_SOURCE`.
 
 ```bash
 uv sync
-uv run palantum doctor --template-source /path/to/motion-pack
+uv run pitchcraft doctor --template-source /path/to/motion-pack
 ```
 
 ### Local `.env` mode
@@ -163,13 +163,13 @@ Use this only when the credentials should come from the repository-local `.env` 
 
 ```bash
 cp .env.example .env
-# fill DEVIN_PAT or DEVIN_API_KEY, OPENAI_API_KEY, PALANTUM_TEMPLATE_SOURCE
-uv run palantum serve
+# fill DEVIN_PAT or DEVIN_API_KEY, OPENAI_API_KEY, PITCHCRAFT_TEMPLATE_SOURCE
+uv run pitchcraft serve
 ```
 
 ### Injected-environment mode
 
-When a shell, CI system, or secret manager injects credentials, use the canonical launcher. It passes `--no-env-file` to `uv`, so a stale local `.env` cannot replace the process values before Palantum starts.
+When a shell, CI system, or secret manager injects credentials, use the canonical launcher. It passes `--no-env-file` to `uv`, so a stale local `.env` cannot replace the process values before PitchCraft starts.
 
 ```powershell
 .\scripts\serve.ps1 -VideosDir . -TemplateSource C:\path\to\motion-pack
@@ -179,15 +179,15 @@ When a shell, CI system, or secret manager injects credentials, use the canonica
 ./scripts/serve.sh --videos-dir . --template-source /path/to/motion-pack
 ```
 
-Palantum's own loader only fills missing variables; it never overwrites an already injected value.
+PitchCraft's own loader only fills missing variables; it never overwrites an already injected value.
 
 ### CLI
 
 ```bash
-uv run palantum --videos-dir ./demo ingest /path/to/source-video.mp4 --template-source /path/to/pack
-uv run palantum --videos-dir ./demo status
-uv run palantum --videos-dir ./demo cut --template-source /path/to/pack
-uv run palantum --videos-dir ./demo export
+uv run pitchcraft --videos-dir ./demo ingest /path/to/source-video.mp4 --template-source /path/to/pack
+uv run pitchcraft --videos-dir ./demo status
+uv run pitchcraft --videos-dir ./demo cut --template-source /path/to/pack
+uv run pitchcraft --videos-dir ./demo export
 ```
 
 ## Verification
@@ -197,7 +197,7 @@ The current suite contains 140 collected tests covering API contracts, determini
 ```bash
 uv run --no-env-file pytest
 uv run --no-env-file ruff check .
-uv run --no-env-file mypy palantum
+uv run --no-env-file mypy pitchcraft
 git diff --check
 ```
 

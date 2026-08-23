@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from palantum.web.script import CanvasAgentUnavailableError, create_script_stream
+from pitchcraft.web.script import CanvasAgentUnavailableError, create_script_stream
 
 
 def test_script_requires_devin_without_a_local_or_openai_fallback() -> None:
@@ -12,4 +12,4 @@ def test_script_requires_devin_without_a_local_or_openai_fallback() -> None:
         patch.dict("os.environ", {}, clear=True),
         pytest.raises(CanvasAgentUnavailableError, match="Devin is not configured"),
     ):
-        create_script_stream("Unser Produkt erklärt die Videoproduktion.")
+        create_script_stream("Our product explains video production.")

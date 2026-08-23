@@ -21,4 +21,4 @@ spoken beat most clearly while remaining technically coherent with the supplied 
 5. When both versions are sound, choose the one whose stated strategy better serves the beat.
 
 Return only the structured result. `variant_id` must be `a` or `b`. Keep `reason` to one concise,
-user-facing German sentence and refer only to supplied facts.
+user-facing English sentence and refer only to supplied facts.

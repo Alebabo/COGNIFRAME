@@ -162,8 +162,8 @@ def _poll_session(
     session_id: str,
     session_url: str,
 ) -> DevinCallResult:
-    timeout_s = float(os.getenv("PALANTUM_DEVIN_TIMEOUT_S", "600"))
-    poll_interval_s = float(os.getenv("PALANTUM_DEVIN_POLL_INTERVAL_S", "10"))
+    timeout_s = float(os.getenv("PITCHCRAFT_DEVIN_TIMEOUT_S", "600"))
+    poll_interval_s = float(os.getenv("PITCHCRAFT_DEVIN_POLL_INTERVAL_S", "10"))
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         response = requests.get(
@@ -247,8 +247,8 @@ def call(
         "prompt": serialized_prompt,
         "structured_output_schema": schema,
         "tags": [f"run-{run_number}", role_id],
-        "title": f"Palantum {role_id} · run {run_number}",
-        "max_acu_limit": int(os.getenv(f"PALANTUM_{role_id}_MAX_ACU", "5")),
+        "title": f"PitchCraft {role_id} · run {run_number}",
+        "max_acu_limit": int(os.getenv(f"PITCHCRAFT_{role_id}_MAX_ACU", "5")),
     }
     snapshot_id = os.getenv("DEVIN_SNAPSHOT_ID")
     if snapshot_id and transport.version == "v1":

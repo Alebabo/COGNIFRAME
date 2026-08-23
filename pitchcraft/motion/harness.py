@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from palantum.motion.catalog import PackReader, build_scene_catalog
+from pitchcraft.motion.catalog import PackReader, build_scene_catalog
 
 REMOTION_VERSION = "4.0.0"
 
@@ -60,7 +60,7 @@ def _package_json(needs_lucide: bool) -> dict[str, Any]:
     if needs_lucide:
         dependencies["lucide-react"] = "0.468.0"
     return {
-        "name": "palantum-motion-slot",
+        "name": "pitchcraft-motion-slot",
         "version": "0.0.0",
         "private": True,
         "scripts": {"render": "remotion render src/index.ts Scene output.mov"},
@@ -224,7 +224,7 @@ export const RemotionRoot: React.FC = () => (
         "target_height": target_height,
         "presentation": resolved_presentation,
     }
-    (slot / "palantum-slot.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (slot / "pitchcraft-slot.json").write_text(json.dumps(manifest, indent=2) + "\n")
     return slot
 
 

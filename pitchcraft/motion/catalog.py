@@ -13,7 +13,7 @@ CATALOG_SCHEMA_VERSION = 3
 CURATION_VERSION = 3
 
 # This is deliberately a small allowlist. The original template sources remain in the
-# user-supplied pack and are not redistributed with Palantum.
+# user-supplied pack and are not redistributed with PitchCraft.
 CURATED_SCENES: dict[str, dict[str, Any]] = {
     "hero-stat-callout": {
         "beat_type": "PROBLEM",
@@ -190,7 +190,7 @@ def _static_parse(source: str, expected_component: str) -> dict[str, Any]:
     if incomplete:
         return {
             "status": "broken",
-            "parser": "palantum-static-v1",
+            "parser": "pitchcraft-static-v1",
             "confidence": 1.0,
             "reason": "incomplete JSX conditional expression",
         }
@@ -198,14 +198,14 @@ def _static_parse(source: str, expected_component: str) -> dict[str, Any]:
     if not export:
         return {
             "status": "broken",
-            "parser": "palantum-static-v1",
+            "parser": "pitchcraft-static-v1",
             "confidence": 0.95,
             "reason": "no exported component declaration found",
         }
     if export.group(1) != expected_component:
         return {
             "status": "broken",
-            "parser": "palantum-static-v1",
+            "parser": "pitchcraft-static-v1",
             "confidence": 0.95,
             "reason": (
                 f"exported component {export.group(1)!r} does not match "
@@ -215,13 +215,13 @@ def _static_parse(source: str, expected_component: str) -> dict[str, Any]:
     if not re.search(r"from\s+['\"]remotion['\"]", source):
         return {
             "status": "broken",
-            "parser": "palantum-static-v1",
+            "parser": "pitchcraft-static-v1",
             "confidence": 0.9,
             "reason": "component does not import Remotion",
         }
     return {
         "status": "ok",
-        "parser": "palantum-static-v1",
+        "parser": "pitchcraft-static-v1",
         "confidence": 0.8,
         "reason": None,
     }
@@ -317,7 +317,7 @@ def build_scene_catalog(source: Path, output: Path) -> dict[str, Any]:
                     "broken_reason": "curated scene is missing from index.json",
                     "static_parse": {
                         "status": "broken",
-                        "parser": "palantum-static-v1",
+                        "parser": "pitchcraft-static-v1",
                         "confidence": 1.0,
                         "reason": "curated scene is missing from index.json",
                     },
@@ -337,7 +337,7 @@ def build_scene_catalog(source: Path, output: Path) -> dict[str, Any]:
                     "broken_reason": f"{type(error).__name__}: {error}",
                     "static_parse": {
                         "status": "broken",
-                        "parser": "palantum-static-v1",
+                        "parser": "pitchcraft-static-v1",
                         "confidence": 1.0,
                         "reason": f"{type(error).__name__}: {error}",
                     },

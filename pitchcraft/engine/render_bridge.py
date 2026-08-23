@@ -18,7 +18,7 @@ _OVERLAY_FILTER_FIXED = "overlay=eof_action=pass:shortest=0:enable='between"
 _BUILD_SUBTITLES = "build_master_srt(edl, edit_dir, subs_path)"
 _HIDE_SUBTITLES = (
     "build_master_srt(edl, edit_dir, subs_path)\n"
-    "            from palantum.engine.render_bridge import "
+    "            from pitchcraft.engine.render_bridge import "
     "hide_subtitles_during_overlays\n"
     "            hide_subtitles_during_overlays(subs_path, edl.get('overlays') or [])"
 )
@@ -161,7 +161,7 @@ def main() -> None:
         raise SystemExit("usage: render_bridge.py <video-use-render.py> [args...]")
     source = Path(sys.argv[1]).resolve()
     arguments = sys.argv[2:]
-    with tempfile.TemporaryDirectory(prefix="palantum-video-use-") as directory:
+    with tempfile.TemporaryDirectory(prefix="pitchcraft-video-use-") as directory:
         root = Path(directory)
         render = root / "render.py"
         render.write_text(patch_render_source(source.read_text(encoding="utf-8")), encoding="utf-8")
