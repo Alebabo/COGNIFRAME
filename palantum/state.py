@@ -41,7 +41,7 @@ def empty_state(schema: dict[str, Any]) -> dict[str, Any]:
         "resolved_notes": [],
         "debate_log": [],
         "brand": {
-            "palette": ["#0B0B0B", "#FF5A00", "#6E6E6E"],
+            "palette": ["#0B0B0B", "#22C55E", "#F4F4F4"],
             "font": "Inter",
             "grade": "neutral_punch",
         },
