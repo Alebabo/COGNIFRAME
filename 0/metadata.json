@@ -1,0 +1,44 @@
+{
+  "cli_version": "0.10.2",
+  "checkpoint_id": "01M0P5FM35DVR3Z45MVPPBQNN2",
+  "session_id": "01a02b78-83ff-7cc1-be01-253d6a0e2db3",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-23T02:04:26.3702519Z",
+  "branch": "codex/unified-palantum",
+  "checkpoints_count": 4,
+  "save_step_count": 1,
+  "files_touched": [
+    "docs/architecture.md",
+    "palantum/agents/backends/devin.py",
+    "palantum/orchestrator.py",
+    "palantum/web/app.py",
+    "scripts/make_fixtures.py",
+    "tests/test_web.py"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.6-sol",
+  "turn_id": "a7ca8748a852",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 586866,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 37535965,
+    "output_tokens": 106341,
+    "api_call_count": 318
+  },
+  "session_metrics": {
+    "turn_count": 6
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-23T02:04:25.8580951Z",
+    "agent_lines": 1412,
+    "agent_removed": 176,
+    "human_added": 3867,
+    "human_modified": 1549,
+    "human_removed": 0,
+    "total_committed": 6828,
+    "total_lines_changed": 7356,
+    "agent_percentage": 21.587819467101685,
+    "metric_version": 2
+  }
+}
