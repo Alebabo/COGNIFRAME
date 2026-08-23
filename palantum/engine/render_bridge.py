@@ -13,6 +13,18 @@ _WINDOWS_SUBTITLE_PATH_FIXED = (
 )
 _OVERLAY_FILTER = "overlay=enable='between"
 _OVERLAY_FILTER_FIXED = "overlay=eof_action=pass:shortest=0:enable='between"
+_SUBTITLE_STYLE = (
+    '"FontName=Helvetica,FontSize=18,Bold=1,"\n'
+    '    "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H00000000,"\n'
+    '    "BorderStyle=1,Outline=2,Shadow=0,"\n'
+    '    "Alignment=2,MarginV=90"'
+)
+_SUBTITLE_STYLE_FIXED = (
+    '"FontName=Helvetica,FontSize=14,Bold=1,"\n'
+    '    "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H00000000,"\n'
+    '    "BorderStyle=1,Outline=1.5,Shadow=0,"\n'
+    '    "Alignment=2,MarginV=45"'
+)
 
 
 def patch_render_source(source: str) -> str:
@@ -21,6 +33,10 @@ def patch_render_source(source: str) -> str:
         if _OVERLAY_FILTER not in source:
             raise RuntimeError("pinned video-use overlay expression changed")
         source = source.replace(_OVERLAY_FILTER, _OVERLAY_FILTER_FIXED, 1)
+    if _SUBTITLE_STYLE_FIXED not in source:
+        if _SUBTITLE_STYLE not in source:
+            raise RuntimeError("pinned video-use subtitle style changed")
+        source = source.replace(_SUBTITLE_STYLE, _SUBTITLE_STYLE_FIXED, 1)
     if os.name == "nt" and _WINDOWS_SUBTITLE_PATH_FIXED not in source:
         if _WINDOWS_SUBTITLE_PATH not in source:
             raise RuntimeError("pinned video-use subtitle path expression changed")

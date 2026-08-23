@@ -4,12 +4,10 @@
 from __future__ import annotations
 
 import argparse
-import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-
-import requests
 
 TAKES = {
     "take_1": (
@@ -30,19 +28,17 @@ DEMO = "Palantum groups every failing run by root cause, so one click opens the 
 
 
 def tts(text: str, destination: Path) -> None:
-    response = requests.post(
-        "https://api.openai.com/v1/audio/speech",
-        headers={"Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"},
-        json={
-            "model": "gpt-4o-mini-tts",
-            "voice": "alloy",
-            "input": text,
-            "response_format": "mp3",
-        },
-        timeout=180,
+    """Generate deterministic fixture speech with a local eSpeak binary."""
+    executable = shutil.which("espeak-ng") or shutil.which("espeak")
+    if executable is None:
+        raise RuntimeError(
+            "Fixture generation requires the local espeak-ng (or espeak) executable."
+        )
+    subprocess.run(
+        [executable, "-v", "en-us", "-s", "155", "-w", str(destination), text],
+        check=True,
+        capture_output=True,
     )
-    response.raise_for_status()
-    destination.write_bytes(response.content)
 
 
 def duration(path: Path) -> float:
@@ -67,7 +63,7 @@ def duration(path: Path) -> float:
 def make_video(text: str, output: Path, color: str, audio_speed: float = 1.0) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="palantum-fixture-") as directory:
-        audio = Path(directory) / "voice.mp3"
+        audio = Path(directory) / "voice.wav"
         tts(text, audio)
         audio_filter = f"atempo={audio_speed}" if audio_speed != 1.0 else None
         command = [
@@ -106,7 +102,7 @@ def make_video(text: str, output: Path, color: str, audio_speed: float = 1.0) ->
 def make_demo_video(output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="palantum-demo-") as directory:
-        audio = Path(directory) / "voice.mp3"
+        audio = Path(directory) / "voice.wav"
         tts(DEMO, audio)
         font = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
         ui = "".join(

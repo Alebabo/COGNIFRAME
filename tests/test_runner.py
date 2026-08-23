@@ -5,6 +5,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from palantum.agents.backends.devin import DevinCallResult
 from palantum.agents.runner import _record_session, run_role
 
@@ -24,15 +26,12 @@ def test_devin_backend_is_the_default_and_records_response_url(tmp_path: Path) -
     assert json.loads(state_path.read_text())["A7"] == {"status": "done", "url": url}
 
 
-def test_openai_backend_must_be_selected_explicitly() -> None:
-    valid = {"findings": [], "verdict": "pass"}
+def test_non_devin_agent_backend_is_rejected() -> None:
     with (
         patch.dict("os.environ", {"PALANTUM_AGENT_BACKEND": "openai"}),
-        patch("palantum.agents.backends.openai.call", return_value=valid) as call,
+        pytest.raises(ValueError, match="require the Devin backend"),
     ):
-        output = run_role("A7", "prompt", {}, None)
-    assert output == valid
-    call.assert_called_once()
+        run_role("A7", "prompt", {}, None)
 
 
 def test_session_state_updates_are_thread_safe_and_atomic(tmp_path: Path) -> None:

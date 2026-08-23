@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from palantum.web.app import _finalize_selection, _process_upload, create_app, state_payload
+from palantum.web.app import (
+    _finalize_selection,
+    _process_chunk_recommendations,
+    _process_upload,
+    _sessions,
+    _transcribe_with_whisper,
+    create_app,
+    state_payload,
+)
 
 
 def test_state_payload_maps_done_and_resolved_notes(tmp_path: Path) -> None:
@@ -37,7 +46,7 @@ def test_state_payload_maps_done_and_resolved_notes(tmp_path: Path) -> None:
 def test_script_endpoint_streams_text_and_identifies_generator(tmp_path: Path) -> None:
     with patch(
         "palantum.web.app.create_script_stream",
-        return_value=(iter(["HOOK\n", "Ein klarer Einstieg."]), "openai"),
+        return_value=(iter(["HOOK\n", "Ein klarer Einstieg."]), "devin"),
     ):
         response = TestClient(create_app(tmp_path)).post(
             "/api/script", json={"prompt": "Unser Produkt soll den Ablauf erklären."}
@@ -45,7 +54,7 @@ def test_script_endpoint_streams_text_and_identifies_generator(tmp_path: Path) -
 
     assert response.status_code == 200
     assert response.text == "HOOK\nEin klarer Einstieg."
-    assert response.headers["x-palantum-generator"] == "openai"
+    assert response.headers["x-palantum-generator"] == "devin"
 
 
 def test_script_endpoint_rejects_empty_prompt(tmp_path: Path) -> None:
@@ -63,9 +72,7 @@ def test_background_failure_is_exposed_in_state(tmp_path: Path) -> None:
     result = state_payload(tmp_path)
 
     assert result["phase"] == "error"
-    assert result["error"] == (
-        "OPENAI_API_KEY fehlt. Bitte den Schlüssel konfigurieren und erneut versuchen."
-    )
+    assert result["error"] == "OPENAI_API_KEY fehlt. Bitte den Schlüssel in der .env konfigurieren."
 
 
 def test_upload_passes_motion_pack_to_background_job(tmp_path: Path) -> None:
@@ -78,12 +85,28 @@ def test_upload_passes_motion_pack_to_background_job(tmp_path: Path) -> None:
         )
 
     assert response.status_code == 200
-    assert submit.call_args.args[1:] == (
-        tmp_path.resolve(),
-        [tmp_path.resolve() / "take.mp4"],
-        None,
-        template.resolve(),
+    worker, worker_root, upload_sources, brief, motion_source = submit.call_args.args
+    assert worker.__name__ == "_process_upload"
+    assert worker_root == tmp_path.resolve()
+    assert upload_sources[0].parent == tmp_path.resolve() / "uploads"
+    assert upload_sources[0].suffix == ".mp4"
+    assert upload_sources[0].read_bytes() == b"video"
+    assert brief is None
+    assert motion_source == template.resolve()
+
+
+def test_upload_cannot_overwrite_project_files(tmp_path: Path) -> None:
+    protected = tmp_path / ".env"
+    protected.write_text("DEVIN_PAT=keep-me", encoding="utf-8")
+    client = TestClient(create_app(tmp_path))
+
+    response = client.post(
+        "/api/upload", files={"files": (".env", b"overwrite", "text/plain")}
     )
+
+    assert response.status_code == 415
+    assert protected.read_text(encoding="utf-8") == "DEVIN_PAT=keep-me"
+    assert not (tmp_path / "uploads").exists()
 
 
 def test_background_upload_builds_chunk_review_from_all_sources(tmp_path: Path) -> None:
@@ -95,7 +118,11 @@ def test_background_upload_builds_chunk_review_from_all_sources(tmp_path: Path) 
     with (
         patch("palantum.web.app.analyze") as analyze,
         patch("palantum.web.app.load", return_value=state),
-        patch("palantum.web.app.build_chunk_variants") as build,
+        patch(
+            "palantum.web.app.build_chunk_variants",
+            return_value={"generation_id": "generation-1"},
+        ) as build,
+        patch("palantum.web.app._RECOMMENDATION_EXECUTOR.submit") as submit,
     ):
         _process_upload(tmp_path, [first, second], "brief")
 
@@ -104,21 +131,299 @@ def test_background_upload_builds_chunk_review_from_all_sources(tmp_path: Path) 
     )
     build.assert_called_once_with(tmp_path / "edit", [first.resolve(), second.resolve()], None)
     assert json.loads((tmp_path / "edit" / "job.json").read_text())["status"] == "review"
+    assert submit.call_args.args == (
+        _process_chunk_recommendations,
+        tmp_path,
+        "generation-1",
+    )
 
 
-def test_frontend_exposes_two_modes_dictation_and_four_output_actions(tmp_path: Path) -> None:
+def test_review_and_manual_selection_are_available_before_delayed_a5(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "take.mp4"
+    source.write_bytes(b"source")
+    edit = tmp_path / "edit"
+    manifest = {
+        "generation_id": "generation-delayed",
+        "status": "review",
+        "recommendations_status": "pending",
+        "chunks": [
+            {
+                "id": "one",
+                "selected": None,
+                "variants": [{"id": "a"}, {"id": "b"}],
+            }
+        ],
+    }
+
+    def build(*_args: object, **_kwargs: object) -> dict[str, object]:
+        edit.mkdir(exist_ok=True)
+        (edit / "chunks.json").write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    with (
+        patch("palantum.web.app.analyze"),
+        patch(
+            "palantum.web.app.load",
+            return_value={"meta": {"sources": [str(source)]}},
+        ),
+        patch("palantum.web.app.build_chunk_variants", side_effect=build),
+        patch("palantum.web.app._RECOMMENDATION_EXECUTOR.submit") as submit,
+    ):
+        _process_upload(tmp_path, [source], None)
+
+    assert json.loads((edit / "job.json").read_text(encoding="utf-8"))["status"] == "review"
+    client = TestClient(create_app(tmp_path))
+    initial = client.get("/api/state").json()
+    response = client.post(
+        "/api/chunks/one/selection", json={"variant_id": "a"}
+    )
+    assert response.status_code == 200
+    assert initial["recommendations_status"] == "pending"
+    assert initial["chunks"][0]["recommendation"] is None
+    assert submit.call_args.args == (
+        _process_chunk_recommendations,
+        tmp_path,
+        "generation-delayed",
+    )
+    worker, *args = submit.call_args.args
+    with patch(
+        "palantum.web.app.recommend_chunk_variants",
+        return_value={
+            "one": {"status": "ready", "variant_id": "b", "reason": "Motion"}
+        },
+    ):
+        assert worker(*args) is True
+    updated = client.get("/api/state").json()
+    assert updated["recommendations_status"] == "complete"
+    assert updated["chunks"][0]["recommendation"]["variant_id"] == "b"
+    assert updated["chunks"][0]["selected"] == "a"
+
+
+def test_a5_timeout_stays_optional_and_keeps_review_selectable(tmp_path: Path) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    manifest = {
+        "generation_id": "generation-timeout",
+        "chunks": [
+            {
+                "id": "one",
+                "selected": None,
+                "variants": [{"id": "a"}, {"id": "b"}],
+            }
+        ],
+    }
+    (edit / "chunks.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (edit / "job.json").write_text(json.dumps({"status": "review"}), encoding="utf-8")
+
+    with patch(
+        "palantum.web.app.recommend_chunk_variants",
+        side_effect=TimeoutError("A5 timed out"),
+    ):
+        updated = _process_chunk_recommendations(tmp_path, "generation-timeout")
+
+    stored = json.loads((edit / "chunks.json").read_text(encoding="utf-8"))
+    assert updated is True
+    assert stored["recommendations_status"] == "unavailable"
+    assert stored["chunks"][0]["recommendation"]["status"] == "unavailable"
+    assert json.loads((edit / "job.json").read_text(encoding="utf-8"))["status"] == "review"
+    assert (
+        TestClient(create_app(tmp_path)).post(
+            "/api/chunks/one/selection", json={"variant_id": "b"}
+        ).status_code
+        == 200
+    )
+
+
+def test_stale_a5_batch_cannot_mutate_a_newer_manifest(tmp_path: Path) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    old = {
+        "generation_id": "generation-old",
+        "chunks": [
+            {"id": "one", "selected": None, "variants": [{"id": "a"}, {"id": "b"}]}
+        ],
+    }
+    new = {
+        "generation_id": "generation-new",
+        "chunks": [
+            {"id": "one", "selected": "b", "variants": [{"id": "a"}, {"id": "b"}]}
+        ],
+    }
+    (edit / "chunks.json").write_text(json.dumps(old), encoding="utf-8")
+    (edit / "job.json").write_text(json.dumps({"status": "review"}), encoding="utf-8")
+    started = threading.Event()
+    release = threading.Event()
+    outcome: list[bool] = []
+
+    def delayed(*_args: object, **_kwargs: object) -> dict[str, dict[str, object]]:
+        started.set()
+        assert release.wait(3)
+        return {"one": {"status": "ready", "variant_id": "a", "reason": "A"}}
+
+    with patch("palantum.web.app.recommend_chunk_variants", side_effect=delayed):
+        worker = threading.Thread(
+            target=lambda: outcome.append(
+                _process_chunk_recommendations(tmp_path, "generation-old")
+            )
+        )
+        worker.start()
+        assert started.wait(3)
+        (edit / "chunks.json").write_text(json.dumps(new), encoding="utf-8")
+        release.set()
+        worker.join(3)
+
+    assert not worker.is_alive()
+    assert outcome == [False]
+    assert json.loads((edit / "chunks.json").read_text(encoding="utf-8")) == new
+
+
+def test_a5_merge_preserves_a_concurrent_manual_selection(tmp_path: Path) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    manifest = {
+        "generation_id": "generation-concurrent",
+        "chunks": [
+            {"id": "one", "selected": None, "variants": [{"id": "a"}, {"id": "b"}]}
+        ],
+    }
+    (edit / "chunks.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (edit / "job.json").write_text(json.dumps({"status": "review"}), encoding="utf-8")
+    started = threading.Event()
+    release = threading.Event()
+    outcome: list[bool] = []
+
+    def delayed(*_args: object, **_kwargs: object) -> dict[str, dict[str, object]]:
+        started.set()
+        assert release.wait(3)
+        return {"one": {"status": "ready", "variant_id": "a", "reason": "A"}}
+
+    with patch("palantum.web.app.recommend_chunk_variants", side_effect=delayed):
+        worker = threading.Thread(
+            target=lambda: outcome.append(
+                _process_chunk_recommendations(tmp_path, "generation-concurrent")
+            )
+        )
+        worker.start()
+        assert started.wait(3)
+        selected = TestClient(create_app(tmp_path)).post(
+            "/api/chunks/one/selection", json={"variant_id": "b"}
+        )
+        release.set()
+        worker.join(3)
+
+    stored = json.loads((edit / "chunks.json").read_text(encoding="utf-8"))
+    assert not worker.is_alive()
+    assert selected.status_code == 200
+    assert outcome == [True]
+    assert stored["chunks"][0]["selected"] == "b"
+    assert stored["chunks"][0]["recommendation"]["variant_id"] == "a"
+    assert stored["recommendations_status"] == "complete"
+
+
+def test_a5_batch_is_skipped_after_job_leaves_review(tmp_path: Path) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    manifest = {
+        "generation_id": "generation-finalizing",
+        "chunks": [
+            {"id": "one", "selected": "a", "variants": [{"id": "a"}, {"id": "b"}]}
+        ],
+    }
+    path = edit / "chunks.json"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    (edit / "job.json").write_text(json.dumps({"status": "review"}), encoding="utf-8")
+    started = threading.Event()
+    release = threading.Event()
+    outcome: list[bool] = []
+
+    def delayed(*_args: object, **_kwargs: object) -> dict[str, dict[str, object]]:
+        started.set()
+        assert release.wait(3)
+        return {"one": {"status": "ready", "variant_id": "b", "reason": "B"}}
+
+    with patch("palantum.web.app.recommend_chunk_variants", side_effect=delayed):
+        worker = threading.Thread(
+            target=lambda: outcome.append(
+                _process_chunk_recommendations(tmp_path, "generation-finalizing")
+            )
+        )
+        worker.start()
+        assert started.wait(3)
+        (edit / "job.json").write_text(json.dumps({"status": "queued"}), encoding="utf-8")
+        release.set()
+        worker.join(3)
+
+    assert not worker.is_alive()
+    assert outcome == [False]
+    assert json.loads(path.read_text(encoding="utf-8")) == manifest
+
+
+def test_a5_submit_failure_finishes_pending_state_without_blocking_review(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "take.mp4"
+    source.write_bytes(b"source")
+    edit = tmp_path / "edit"
+    manifest = {
+        "generation_id": "generation-submit-failed",
+        "status": "review",
+        "recommendations_status": "pending",
+        "chunks": [
+            {"id": "one", "selected": None, "variants": [{"id": "a"}, {"id": "b"}]}
+        ],
+    }
+
+    def build(*_args: object, **_kwargs: object) -> dict[str, object]:
+        edit.mkdir(exist_ok=True)
+        (edit / "chunks.json").write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest
+
+    with (
+        patch("palantum.web.app.analyze"),
+        patch(
+            "palantum.web.app.load",
+            return_value={"meta": {"sources": [str(source)]}},
+        ),
+        patch("palantum.web.app.build_chunk_variants", side_effect=build),
+        patch(
+            "palantum.web.app._RECOMMENDATION_EXECUTOR.submit",
+            side_effect=RuntimeError("executor unavailable"),
+        ),
+    ):
+        _process_upload(tmp_path, [source], None)
+
+    state = state_payload(tmp_path)
+    assert state["phase"] == "review"
+    assert state["recommendations_status"] == "unavailable"
+    assert state["chunks"][0]["recommendation"]["status"] == "unavailable"
+
+
+def test_frontend_exposes_canvas_agent_status_and_actions(tmp_path: Path) -> None:
     response = TestClient(create_app(tmp_path)).get("/")
 
     assert response.status_code == 200
-    assert 'id="mode-script"' in response.text
-    assert 'id="mode-video"' in response.text
-    assert 'aria-label="Sachverhalt diktieren"' in response.text
-    assert response.text.count('class="action"') == 4
+    assert 'id="prompt"' in response.text
+    assert 'id="avatar-stack"' in response.text
+    assert 'id="cursor-director"' in response.text
+    assert 'id="cursor-strategist"' in response.text
+    assert 'id="cursor-supervisor"' in response.text
+    assert 'id="toolbar"' in response.text
+    assert 'id="mic"' in response.text
+    assert 'id="generate"' in response.text
     assert 'class="corner-logo"' in response.text
-    assert "data.phase==='error'" in response.text
-    assert response.text.index('id="compose-error"') < response.text.index('id="video-mode"')
     assert 'id="chunk-review"' in response.text
     assert 'id="finalize"' in response.text
+    assert 'id="apply-recommendations"' in response.text
+    assert "new AbortController()" in response.text
+    assert "signal: controller.signal" in response.text
+    assert "error?.name === 'AbortError'" in response.text
+    assert "sequence !== state.orchestrationSequence" in response.text
+    assert "revision !== state.textRevision" in response.text
+    assert "state.seenRequestIds.has(responseId)" in response.text
+    assert "data.recommendations_status === 'pending'" in response.text
+    assert "state.uploading || state.pollingRecommendations" in response.text
 
 
 def test_state_payload_exposes_two_variants_per_chunk_for_review(tmp_path: Path) -> None:
@@ -136,6 +441,11 @@ def test_state_payload_exposes_two_variants_per_chunk_for_review(tmp_path: Path)
                         "order": 0,
                         "beat": "HOOK",
                         "selected": None,
+                        "recommendation": {
+                            "status": "ready",
+                            "variant_id": "b",
+                            "reason": "Die Motion-Fassung erklärt den Beat.",
+                        },
                         "variants": [
                             {"id": "a", "label": "Version A", "name": "Clean Cut"},
                             {"id": "b", "label": "Version B", "name": "Motion Cut"},
@@ -151,7 +461,101 @@ def test_state_payload_exposes_two_variants_per_chunk_for_review(tmp_path: Path)
 
     assert result["phase"] == "review"
     assert [item["id"] for item in result["chunks"][0]["variants"]] == ["a", "b"]
+    assert result["chunks"][0]["recommendation"]["variant_id"] == "b"
     assert result["selection_complete"] is False
+
+
+def test_state_uses_one_coherent_chunk_manifest_snapshot(tmp_path: Path) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    (edit / "job.json").write_text(json.dumps({"status": "review"}), encoding="utf-8")
+    pending = {
+        "generation_id": "one",
+        "recommendations_status": "pending",
+        "chunks": [
+            {"id": "one", "selected": None, "variants": [{"id": "a"}, {"id": "b"}]}
+        ],
+    }
+    completed = {
+        **pending,
+        "recommendations_status": "complete",
+        "chunks": [
+            {
+                **pending["chunks"][0],
+                "recommendation": {
+                    "status": "ready",
+                    "variant_id": "b",
+                    "reason": "B",
+                },
+            }
+        ],
+    }
+
+    with patch(
+        "palantum.web.app._read_chunks", side_effect=[pending, completed]
+    ) as read_chunks:
+        result = state_payload(tmp_path)
+
+    assert read_chunks.call_count == 1
+    assert result["recommendations_status"] == "pending"
+    assert result["chunks"][0]["recommendation"] is None
+
+
+def test_legacy_chunk_manifest_without_recommendation_stays_manual(tmp_path: Path) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    (edit / "job.json").write_text(json.dumps({"status": "review"}), encoding="utf-8")
+    (edit / "chunks.json").write_text(
+        json.dumps(
+            {
+                "chunks": [
+                    {
+                        "id": "legacy",
+                        "order": 0,
+                        "beat": "HOOK",
+                        "selected": "removed-variant",
+                        "variants": [{"id": "a"}, {"id": "b"}],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    client = TestClient(create_app(tmp_path))
+
+    state = client.get("/api/state").json()
+
+    assert state["chunks"][0]["recommendation"] is None
+    assert state["recommendations_status"] == "complete"
+    assert state["selection_complete"] is False
+    assert client.post("/api/finalize").status_code == 409
+
+
+def test_variant_supervisor_sessions_are_aggregated_by_role(tmp_path: Path) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    (edit / "sessions.json").write_text(
+        json.dumps(
+            {
+                "chunk-00-hook.recommendation": {
+                    "role": "A5",
+                    "status": "done",
+                    "url": "https://app.devin.ai/sessions/a5-done",
+                },
+                "chunk-01-demo.recommendation": {
+                    "role": "A5",
+                    "status": "running",
+                    "url": "https://app.devin.ai/sessions/a5-running",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    supervisor = next(item for item in _sessions(edit) if item["role"] == "Variant Supervisor")
+
+    assert supervisor["status"] == "running"
+    assert supervisor["url"] == "https://app.devin.ai/sessions/a5-running"
 
 
 def test_chunk_selection_and_preview_endpoints(tmp_path: Path) -> None:
@@ -216,8 +620,113 @@ def test_finalize_requires_complete_selection_and_starts_background_job(
     assert submit.call_args.args == (_finalize_selection, tmp_path.resolve())
 
 
+def test_apply_recommendations_is_atomic_and_selects_every_chunk(tmp_path: Path) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    manifest = {
+        "chunks": [
+            {
+                "id": "one",
+                "selected": "a",
+                "recommendation": {"status": "ready", "variant_id": "b", "reason": "B"},
+                "variants": [{"id": "a"}, {"id": "b"}],
+            },
+            {
+                "id": "two",
+                "selected": None,
+                "recommendation": {"status": "ready", "variant_id": "a", "reason": "A"},
+                "variants": [{"id": "a"}, {"id": "b"}],
+            },
+        ]
+    }
+    (edit / "chunks.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    response = TestClient(create_app(tmp_path)).post("/api/chunks/recommendations/apply")
+
+    assert response.status_code == 200
+    assert response.json()["selection_complete"] is True
+    stored = json.loads((edit / "chunks.json").read_text(encoding="utf-8"))
+    assert [chunk["selected"] for chunk in stored["chunks"]] == ["b", "a"]
+
+
+def test_apply_recommendations_applies_ready_subset_atomically(tmp_path: Path) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    manifest = {
+        "chunks": [
+            {
+                "id": "one",
+                "selected": None,
+                "recommendation": {"status": "ready", "variant_id": "b", "reason": "B"},
+                "variants": [{"id": "a"}, {"id": "b"}],
+            },
+            {
+                "id": "two",
+                "selected": None,
+                "recommendation": {"status": "unavailable", "variant_id": None, "reason": ""},
+                "variants": [{"id": "a"}, {"id": "b"}],
+            },
+        ]
+    }
+    path = edit / "chunks.json"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    response = TestClient(create_app(tmp_path)).post("/api/chunks/recommendations/apply")
+
+    assert response.status_code == 200
+    assert response.json()["selection_complete"] is False
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    assert [chunk["selected"] for chunk in stored["chunks"]] == ["b", None]
+
+
+def test_selection_cannot_make_a_finished_master_stale(tmp_path: Path) -> None:
+    edit = tmp_path / "edit"
+    edit.mkdir()
+    manifest = {
+        "chunks": [
+            {
+                "id": "one",
+                "selected": "a",
+                "recommendation": {"status": "ready", "variant_id": "b", "reason": "B"},
+                "variants": [{"id": "a"}, {"id": "b"}],
+            }
+        ]
+    }
+    path = edit / "chunks.json"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    (edit / "job.json").write_text(json.dumps({"status": "done"}), encoding="utf-8")
+    client = TestClient(create_app(tmp_path))
+
+    selected = client.post("/api/chunks/one/selection", json={"variant_id": "b"})
+    applied = client.post("/api/chunks/recommendations/apply")
+
+    assert selected.status_code == 409
+    assert applied.status_code == 409
+    assert json.loads(path.read_text(encoding="utf-8"))["chunks"][0]["selected"] == "a"
+
+
 def test_frontend_serves_corner_logo(tmp_path: Path) -> None:
     response = TestClient(create_app(tmp_path)).get("/palantum-logo.png")
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
+
+
+def test_whisper_call_is_offloaded_from_async_request_loop(tmp_path: Path) -> None:
+    worker = AsyncMock(return_value="Transkribierter Text")
+    client = TestClient(create_app(tmp_path))
+
+    with (
+        patch.dict("os.environ", {"OPENAI_API_KEY": "whisper-test-key"}),
+        patch("palantum.web.app.run_in_threadpool", worker),
+    ):
+        response = client.post(
+            "/api/transcribe",
+            files={"file": ("voice.wav", b"audio", "audio/wav")},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"text": "Transkribierter Text"}
+    function, _temporary, api_key = worker.await_args.args
+    assert function is _transcribe_with_whisper
+    assert api_key == "whisper-test-key"

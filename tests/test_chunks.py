@@ -7,7 +7,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 from palantum.engine.videouse import ProbeResult
-from palantum.orchestrator import build_chunk_variants, finalize_chunk_variants
+from palantum.orchestrator import (
+    _recommend_chunk_variant,
+    _variant_supervisor_context,
+    build_chunk_variants,
+    finalize_chunk_variants,
+    recommend_chunk_variants,
+)
 
 
 def _state(edit_dir: Path, source: Path) -> None:
@@ -55,7 +61,21 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
     edit_dir.mkdir()
     source = tmp_path / "take.mp4"
     source.write_bytes(b"video")
+    template = tmp_path / "templates.zip"
+    template.write_bytes(b"templates")
     _state(edit_dir, source)
+    approved_catalog = {
+        "source": {"sha256": "abc"},
+        "scenes": [
+            {
+                "id": "hero-stat-callout",
+                "type": "PROBLEM",
+                "status": "ok",
+                "confidence": 0.9,
+            }
+        ],
+    }
+    (edit_dir / "scene-catalog.json").write_text(json.dumps(approved_catalog), encoding="utf-8")
     seed = [
         {
             "source": "take",
@@ -77,6 +97,7 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
     active = 0
     maximum = 0
     lock = threading.Lock()
+    role_calls: list[str] = []
 
     def cached_role(
         _edit_dir: Path,
@@ -88,8 +109,11 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
         resume: bool,
     ) -> dict[str, object]:
         del resume
+        role_calls.append(cache_key)
         if cache_key == "A4-chunk-plan":
             return {"ranges": seed, "total_duration_s": 4.0, "notes": "plan"}
+        if cache_key.startswith("A5-"):
+            return {"variant_id": "b", "reason": "Die Motion-Fassung stützt den Beat."}
         nonlocal active, maximum
         with lock:
             active += 1
@@ -107,22 +131,145 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
         output.write_bytes(b"preview")
         return output
 
+    def fake_graphics(*_args: object, **_kwargs: object) -> list[dict[str, object]]:
+        return [
+            {
+                "file": "animations/slot-01/overlay.mov",
+                "start_in_output": 0.25,
+                "duration": 1.0,
+                "slot_id": "slot-01",
+                "template_id": "hero-stat-callout",
+                "beat": "HOOK",
+            }
+        ]
+
     with (
         patch("palantum.orchestrator._cached_role", side_effect=cached_role),
-        patch("palantum.orchestrator._motion_source", return_value=None),
+        patch("palantum.orchestrator._motion_source", return_value=template),
+        patch("palantum.orchestrator._graphics_overlays", side_effect=fake_graphics) as graphics,
         patch("palantum.orchestrator.render", side_effect=fake_render),
         patch("palantum.orchestrator.probe", side_effect=_probe),
     ):
-        manifest = build_chunk_variants(edit_dir, [source])
+        manifest = build_chunk_variants(edit_dir, [source], template)
+        assert not any(key.startswith("A5-") for key in role_calls)
+        persisted_before_a5 = json.loads(
+            (edit_dir / "chunks.json").read_text(encoding="utf-8")
+        )
+        recommendations = recommend_chunk_variants(edit_dir, manifest)
+    persisted = json.loads((edit_dir / "chunks.json").read_text(encoding="utf-8"))
 
     assert manifest["status"] == "review"
+    assert manifest["generation_id"]
+    assert persisted_before_a5 == manifest
+    assert persisted == manifest
     assert len(manifest["chunks"]) == 2
     assert all(
         [variant["id"] for variant in chunk["variants"]] == ["a", "b"]
         for chunk in manifest["chunks"]
     )
     assert maximum >= 2
+    assert len(graphics.call_args_list) == 2
+    assert all(
+        call.kwargs["approved_catalog"] == approved_catalog for call in graphics.call_args_list
+    )
+    assert all(call.kwargs["required_overlays"] == 1 for call in graphics.call_args_list)
+    assert all(
+        len(next(item for item in chunk["variants"] if item["id"] == "a")["overlays"])
+        == 0
+        for chunk in manifest["chunks"]
+    )
+    assert all(
+        len(next(item for item in chunk["variants"] if item["id"] == "b")["overlays"])
+        == 1
+        for chunk in manifest["chunks"]
+    )
+    assert recommendations == {
+        str(chunk["id"]): {
+            "status": "ready",
+            "variant_id": "b",
+            "reason": "Die Motion-Fassung stützt den Beat.",
+        }
+        for chunk in manifest["chunks"]
+    }
+    assert all("recommendation" not in chunk for chunk in manifest["chunks"])
+    assert all(
+        variant["probe"]
+        == {
+            "duration_s": 4.0,
+            "width": 1920,
+            "height": 1080,
+            "fps": 24.0,
+            "has_audio": True,
+        }
+        for chunk in persisted["chunks"]
+        for variant in chunk["variants"]
+    )
+    assert all(
+        "path" not in variant["probe"]
+        for chunk in persisted["chunks"]
+        for variant in chunk["variants"]
+    )
     assert (edit_dir / "chunks" / "chunk-00-hook" / "a" / "preview.mp4").exists()
+
+
+def test_variant_supervisor_context_forwards_file_free_probe_measurements(
+    tmp_path: Path,
+) -> None:
+    measurements = {
+        "duration_s": 3.75,
+        "width": 1080,
+        "height": 1920,
+        "fps": 29.97,
+        "has_audio": True,
+    }
+    context = _variant_supervisor_context(
+        {"id": "chunk-00-hook", "beat": "HOOK"},
+        [
+            {
+                "id": "a",
+                "duration_s": 3.75,
+                "expected_duration_s": 4.0,
+                "probe": measurements,
+            },
+            {
+                "id": "b",
+                "duration_s": 4.0,
+                "expected_duration_s": 4.0,
+            },
+        ],
+        {
+            "run_number": 1,
+            "_session_state_path": str(tmp_path / "sessions.json"),
+        },
+    )
+
+    variants = context["chunk"]["variants"]
+    assert variants[0]["probe"] == measurements
+    assert variants[0]["probe"] is not measurements
+    assert "path" not in variants[0]["probe"]
+    assert variants[1]["probe"] == {}
+
+
+def test_variant_supervisor_failure_keeps_manual_review_available(tmp_path: Path) -> None:
+    variants = [{"id": "a"}, {"id": "b"}]
+    base_context = {
+        "run_number": 1,
+        "_session_state_path": str(tmp_path / "sessions.json"),
+    }
+    with patch("palantum.orchestrator._cached_role", side_effect=TimeoutError("offline")):
+        recommendation = _recommend_chunk_variant(
+            tmp_path,
+            {"id": "chunk-00-hook", "beat": "HOOK"},
+            variants,
+            base_context,
+            resume=False,
+        )
+
+    assert recommendation == {
+        "status": "unavailable",
+        "variant_id": None,
+        "reason": "Die KI-Empfehlung ist derzeit nicht verfügbar.",
+    }
 
 
 def test_finalize_chunk_variants_offsets_selected_chunk_overlays(tmp_path: Path) -> None:

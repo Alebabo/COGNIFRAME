@@ -6,6 +6,22 @@ from types import SimpleNamespace
 from palantum.engine import visual
 
 
+def test_visual_classification_stays_local_and_conservative(tmp_path: Path) -> None:
+    frame = tmp_path / "frame.png"
+    frame.write_bytes(b"png")
+
+    result = visual._classify([frame])
+
+    assert result == {
+        "kind": "unknown",
+        "has_ui": False,
+        "description": (
+            "Lokale Frames wurden extrahiert; eine semantische "
+            "Bildklassifizierung ist nicht aktiviert."
+        ),
+    }
+
+
 def test_visual_failure_is_cached_as_unknown(tmp_path: Path, monkeypatch: object) -> None:
     source = tmp_path / "take.mp4"
     source.write_bytes(b"source")
