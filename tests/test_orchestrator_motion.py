@@ -70,6 +70,36 @@ def test_overlay_plan_enforces_catalog_slots_timing_and_non_overlap() -> None:
         _validate_overlay_plan([overlay, overlapping], scenes, timeline)
 
 
+def test_structured_motion_gets_longer_reading_time_inside_its_beat() -> None:
+    scene = _scene("flowchart", "SOLUTION") | {
+        "content_kind": "structured",
+        "min_visible_s": 4.5,
+    }
+    overlay = {
+        "slot_id": "solution-01",
+        "template_id": "flowchart",
+        "beat": "SOLUTION",
+        "start_in_output": 5.0,
+        "duration": 2.0,
+        "props": {"title": "Flow"},
+        "reason": "Explain the process",
+    }
+    timeline = [
+        {
+            "beat": "SOLUTION",
+            "start_in_output": 2.0,
+            "end_in_output": 8.0,
+            "duration": 6.0,
+            "quote": "Process",
+        }
+    ]
+
+    result = _validate_overlay_plan([overlay], [scene], timeline)[0]
+
+    assert result["start_in_output"] == 3.5
+    assert result["duration"] == 4.5
+
+
 def test_hero_props_require_numeric_value_and_readable_contrast() -> None:
     scene = {
         "id": "hero-stat-callout",
@@ -131,6 +161,10 @@ def test_opaque_unknown_scene_is_rerendered_as_inset(tmp_path: Path) -> None:
 
     assert materialize.call_count == 2
     assert materialize.call_args_list[1].kwargs["presentation"] == "inset"
+    assert all(
+        call.kwargs["render_duration_s"] == 2.0
+        for call in materialize.call_args_list
+    )
     assert result["visual_qc"] == {
         "presentation": "inset",
         "max_alpha_coverage": 0.2,

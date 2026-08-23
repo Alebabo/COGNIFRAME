@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -50,13 +51,24 @@ def _cached_role(
     context: dict[str, Any],
     *,
     resume: bool,
+    semantic_validator: Callable[[dict[str, Any]], list[str]] | None = None,
+    max_feedback_rounds: int = 0,
 ) -> dict[str, Any]:
     if not re.fullmatch(r"[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*", cache_key):
         raise ValueError(f"unsafe role cache key: {cache_key}")
     path = edit_dir / "role-cache" / f"{cache_key}.json"
     if resume and path.exists():
-        return _read_json(path)
-    output = run_role(role_id, prompt, context, None)
+        cached = _read_json(path)
+        if semantic_validator is None or not semantic_validator(cached):
+            return cached
+    output = run_role(
+        role_id,
+        prompt,
+        context,
+        None,
+        semantic_validator=semantic_validator,
+        max_feedback_rounds=max_feedback_rounds,
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return output
@@ -622,8 +634,24 @@ def _validate_overlay_plan(
             start = float(window["start_in_output"])
             containing_windows = [window]
         if containing_windows:
-            available = max(float(item["end_in_output"]) - start for item in containing_windows)
-            duration = min(duration, float(scene["duration_s"]), available)
+            window = max(
+                containing_windows,
+                key=lambda item: float(item["end_in_output"]) - start,
+            )
+            window_start = float(window["start_in_output"])
+            window_end = float(window["end_in_output"])
+            min_visible = float(scene.get("min_visible_s", 0))
+            if min_visible > 0 and window_end - start < min_visible:
+                start = max(window_start, window_end - min_visible)
+            available = window_end - start
+            if min_visible > 0:
+                duration = min(
+                    max(duration, min_visible),
+                    max(float(scene["duration_s"]), min_visible),
+                    available,
+                )
+            else:
+                duration = min(duration, float(scene["duration_s"]), available)
         end = start + duration
         if duration <= 0:
             raise ValueError(f"A6 overlay {slot_id} has no usable duration")
@@ -794,6 +822,7 @@ def _render_motion_job(
         slot_id=slot_id,
         target_width=target_size[0],
         target_height=target_size[1],
+        render_duration_s=float(overlay["duration"]),
     )
     output = slot / "render.mov"
     reuse = (
@@ -822,6 +851,7 @@ def _render_motion_job(
             target_width=target_size[0],
             target_height=target_size[1],
             presentation="inset",
+            render_duration_s=float(overlay["duration"]),
         )
         output = slot / "render.mov"
         subprocess.run(build_render_command(slot, output), cwd=slot, check=True)
@@ -1249,6 +1279,57 @@ def _budgeted_a4_context(
     )
 
 
+def _a4_range_findings(
+    output: dict[str, Any],
+    *,
+    allowed_beats: list[str],
+    allowed_sources: set[str],
+    expected_beat: str | None = None,
+) -> list[str]:
+    """Return concise deterministic findings for one bounded A4 revision."""
+    ranges = output.get("ranges")
+    if not isinstance(ranges, list) or not ranges:
+        return ["ranges must contain at least one cut"]
+
+    findings: list[str] = []
+    beat_positions = {beat: index for index, beat in enumerate(allowed_beats)}
+    last_position = -1
+    measured_duration = 0.0
+    for index, item in enumerate(ranges):
+        if not isinstance(item, dict):
+            findings.append(f"range {index} is not an object")
+            continue
+        beat = str(item.get("beat", ""))
+        source = str(item.get("source", ""))
+        start = float(item.get("start", 0))
+        end = float(item.get("end", 0))
+        if expected_beat is not None and beat != expected_beat:
+            findings.append(f"range {index} must keep beat {expected_beat}, got {beat}")
+        elif beat not in beat_positions:
+            findings.append(f"range {index} uses unknown or missing beat {beat}")
+        else:
+            position = beat_positions[beat]
+            if position < last_position:
+                findings.append(f"range {index} puts beat {beat} out of Director order")
+            last_position = max(last_position, position)
+        if source not in allowed_sources:
+            findings.append(f"range {index} uses unknown source {source}")
+        if start < 0 or end <= start:
+            findings.append(f"range {index} has invalid interval {start:g}-{end:g}")
+        else:
+            measured_duration += end - start
+        if len(findings) >= 8:
+            return findings
+
+    reported_duration = float(output.get("total_duration_s", 0))
+    if abs(reported_duration - measured_duration) > 0.25:
+        findings.append(
+            "total_duration_s does not match the sum of the selected ranges "
+            f"({reported_duration:g} vs {measured_duration:g})"
+        )
+    return findings[:8]
+
+
 def _chunk_groups(ranges: list[dict[str, Any]]) -> list[dict[str, Any]]:
     groups: list[dict[str, Any]] = []
     for item in ranges:
@@ -1336,6 +1417,13 @@ def _build_chunk_variant(
         prompt,
         context,
         resume=resume,
+        semantic_validator=lambda output: _a4_range_findings(
+            output,
+            allowed_beats=[str(chunk["beat"])],
+            allowed_sources=set(source_map),
+            expected_beat=str(chunk["beat"]),
+        ),
+        max_feedback_rounds=1,
     )
     ranges = _validate_chunk_ranges(chunk, decision["ranges"], source_map)
     overlays: list[dict[str, Any]] = []
@@ -1538,6 +1626,12 @@ def build_chunk_variants(
     base_context = _chunk_base_context(
         edit_dir, state, manifest_generation=generation
     )
+    source_map = {source.stem: str(source.resolve()) for source in sources}
+    allowed_beats = [
+        str(beat["id"])
+        for beat in base_context["director"].get("beats", [])
+        if isinstance(beat, dict) and str(beat.get("status", "")) != "missing"
+    ]
     a4_prompt = _prompt("A4")
     chunk_plan = _cached_role(
         edit_dir,
@@ -1546,11 +1640,16 @@ def build_chunk_variants(
         a4_prompt,
         _budgeted_a4_context(base_context, a4_prompt),
         resume=resume,
+        semantic_validator=lambda output: _a4_range_findings(
+            output,
+            allowed_beats=allowed_beats,
+            allowed_sources=set(source_map),
+        ),
+        max_feedback_rounds=1,
     )
     chunks = _chunk_groups(chunk_plan["ranges"])
     if not chunks:
         raise RuntimeError("A4 produced no semantic chunks")
-    source_map = {source.stem: str(source.resolve()) for source in sources}
     first_source = probe(sources[0])
     target_size = (1080, 1920) if first_source.height > first_source.width else (1920, 1080)
     motion_source = _motion_source(template_source, state)

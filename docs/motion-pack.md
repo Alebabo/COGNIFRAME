@@ -27,6 +27,11 @@ transparent, top-right inset; it is rejected if it remains too opaque. Known ful
 catalogued as insets from the start. The generated harness always renders at the detected delivery
 orientation, so landscape delivery remains 1920x1080 and portrait delivery is 1080x1920.
 
+Scenes containing charts, flows, UI, cards, or other shapes are catalogued as `structured`. Palantum
+keeps them visible for at least 4.5 seconds when their beat permits, slows their animation when extra
+time is available, and preserves roughly one second on the final frame. Burned-in subtitles are
+removed only for the active motion intervals and return immediately afterwards.
+
 Scene-specific prop checks run before rendering. In particular, `hero-stat-callout` is available
 only for timeline quotes with a numeric claim, its `heroValue` must contain one number understood by
 the template, and its background must maintain at least 4.5:1 contrast against the fixed text color.

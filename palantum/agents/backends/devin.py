@@ -156,6 +156,75 @@ def serialize_prompt(prompt: str, context: dict[str, Any]) -> str:
     )
 
 
+def _poll_session(
+    role_id: str,
+    transport: _DevinTransport,
+    session_id: str,
+    session_url: str,
+) -> DevinCallResult:
+    timeout_s = float(os.getenv("PALANTUM_DEVIN_TIMEOUT_S", "600"))
+    poll_interval_s = float(os.getenv("PALANTUM_DEVIN_POLL_INTERVAL_S", "10"))
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        response = requests.get(
+            f"{transport.session_base_url}/{session_id}",
+            headers=_headers(transport.token),
+            timeout=30,
+        )
+        response.raise_for_status()
+        current = response.json()
+        if not isinstance(current, dict):
+            raise ValueError(f"Devin role {role_id} returned an invalid session payload")
+
+        if transport.version == "v3":
+            v3_status = str(current.get("status") or "")
+            status_detail = str(current.get("status_detail") or "")
+            output = current.get("structured_output")
+            if v3_status == "running" and status_detail == "finished":
+                return _finished_result(role_id, current, session_id, session_url)
+            if v3_status == "exit" and isinstance(output, dict):
+                return DevinCallResult(
+                    output=output,
+                    session_id=session_id,
+                    url=session_url,
+                )
+            if v3_status in {"exit", "error", "suspended"}:
+                redacted_status_detail = _redact_configured_tokens(status_detail)
+                detail = _redact_configured_tokens(str(current))
+                raise RuntimeError(
+                    f"Devin role {role_id} ended {v3_status} "
+                    f"({redacted_status_detail or 'no status detail'}): {detail}"
+                )
+        else:
+            v1_status = current.get("status_enum") or current.get("status")
+            output = current.get("structured_output")
+            if v1_status in {"finished", "blocked"} and isinstance(output, dict):
+                return DevinCallResult(
+                    output=output,
+                    session_id=session_id,
+                    url=session_url,
+                )
+            if v1_status == "finished":
+                return _finished_result(role_id, current, session_id, session_url)
+            if v1_status in {"blocked", "expired", "stopped"}:
+                detail = _redact_configured_tokens(str(current))
+                raise RuntimeError(
+                    f"Devin role {role_id} ended {v1_status}: {detail}"
+                )
+        time.sleep(poll_interval_s)
+
+    raise TimeoutError(f"Devin role {role_id} exceeded {timeout_s:.0f}s")
+
+
+def _terminate_session(transport: _DevinTransport, session_id: str) -> None:
+    terminated = requests.delete(
+        f"{transport.session_base_url}/{session_id}",
+        headers=_headers(transport.token),
+        timeout=30,
+    )
+    terminated.raise_for_status()
+
+
 def call(
     role_id: str,
     prompt: str,
@@ -207,70 +276,52 @@ def call(
     if on_session_created is not None:
         on_session_created(session_id, session_url)
 
-    timeout_s = float(os.getenv("PALANTUM_DEVIN_TIMEOUT_S", "600"))
-    poll_interval_s = float(os.getenv("PALANTUM_DEVIN_POLL_INTERVAL_S", "10"))
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        response = requests.get(
-            f"{transport.session_base_url}/{session_id}",
-            headers=headers,
-            timeout=30,
+    try:
+        return _poll_session(role_id, transport, session_id, session_url)
+    except TimeoutError:
+        _terminate_session(transport, session_id)
+        if attempt == 0:
+            return call(
+                role_id,
+                prompt,
+                context,
+                schema,
+                attempt=1,
+                on_session_created=on_session_created,
+            )
+        raise
+
+
+def continue_session(
+    role_id: str,
+    session_id: str,
+    session_url: str,
+    message: str,
+) -> DevinCallResult:
+    """Send one bounded correction to an existing Devin session and await output."""
+    if len(message) >= DEVIN_PROMPT_LIMIT_CHARS:
+        raise ValueError(
+            f"Devin role {role_id} feedback has {len(message)} characters; "
+            f"the limit is <{DEVIN_PROMPT_LIMIT_CHARS}"
         )
-        response.raise_for_status()
-        current = response.json()
-        if not isinstance(current, dict):
-            raise ValueError(f"Devin role {role_id} returned an invalid session payload")
-
-        if transport.version == "v3":
-            v3_status = str(current.get("status") or "")
-            status_detail = str(current.get("status_detail") or "")
-            output = current.get("structured_output")
-            if v3_status == "running" and status_detail == "finished":
-                return _finished_result(role_id, current, session_id, session_url)
-            if v3_status == "exit" and isinstance(output, dict):
-                return DevinCallResult(
-                    output=output,
-                    session_id=session_id,
-                    url=session_url,
-                )
-            if v3_status in {"exit", "error", "suspended"}:
-                redacted_status_detail = _redact_configured_tokens(status_detail)
-                detail = _redact_configured_tokens(str(current))
-                raise RuntimeError(
-                    f"Devin role {role_id} ended {v3_status} "
-                    f"({redacted_status_detail or 'no status detail'}): {detail}"
-                )
-        else:
-            v1_status = current.get("status_enum") or current.get("status")
-            output = current.get("structured_output")
-            if v1_status in {"finished", "blocked"} and isinstance(output, dict):
-                return DevinCallResult(
-                    output=output,
-                    session_id=session_id,
-                    url=session_url,
-                )
-            if v1_status == "finished":
-                return _finished_result(role_id, current, session_id, session_url)
-            if v1_status in {"blocked", "expired", "stopped"}:
-                detail = _redact_configured_tokens(str(current))
-                raise RuntimeError(
-                    f"Devin role {role_id} ended {v1_status}: {detail}"
-                )
-        time.sleep(poll_interval_s)
-
-    terminated = requests.delete(
-        f"{transport.session_base_url}/{session_id}",
-        headers=headers,
-        timeout=30,
+    transport = _resolve_transport()
+    suffix = "messages" if transport.version == "v3" else "message"
+    response = requests.post(
+        f"{transport.session_base_url}/{session_id}/{suffix}",
+        headers=_headers(transport.token),
+        json={"message": message},
+        timeout=60,
     )
-    terminated.raise_for_status()
-    if attempt == 0:
-        return call(
-            role_id,
-            prompt,
-            context,
-            schema,
-            attempt=1,
-            on_session_created=on_session_created,
-        )
-    raise TimeoutError(f"Devin role {role_id} exceeded {timeout_s:.0f}s")
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        detail = _redact_configured_tokens(response.text.strip())[:2000]
+        raise RuntimeError(
+            f"Devin role {role_id} feedback failed "
+            f"({response.status_code}): {detail or 'no response body'}"
+        ) from exc
+    try:
+        return _poll_session(role_id, transport, session_id, session_url)
+    except TimeoutError:
+        _terminate_session(transport, session_id)
+        raise

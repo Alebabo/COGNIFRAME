@@ -4,12 +4,14 @@ import json
 import os
 import tempfile
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
 from jsonschema import Draft202012Validator
 
 _SESSION_STATE_LOCK = threading.Lock()
+SemanticValidator = Callable[[dict[str, Any]], list[str]]
 
 
 def _schema(role_id: str) -> dict[str, Any]:
@@ -28,7 +30,11 @@ def _validate(role_id: str, output: dict[str, Any]) -> None:
 
 
 def _record_session(
-    context: dict[str, Any], role_id: str, status: str, url: str | None = None
+    context: dict[str, Any],
+    role_id: str,
+    status: str,
+    url: str | None = None,
+    details: dict[str, Any] | None = None,
 ) -> None:
     path_value = context.get("_session_state_path")
     if not path_value:
@@ -47,6 +53,8 @@ def _record_session(
         entry: dict[str, Any] = {"status": status, "url": url}
         if session_key != role_id:
             entry["role"] = role_id
+        if details:
+            entry.update(details)
         sessions[session_key] = entry
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary_path: Path | None = None
@@ -68,8 +76,23 @@ def _record_session(
                 temporary_path.unlink()
 
 
+def _feedback_message(role_id: str, findings: list[str]) -> str:
+    bullets = "\n".join(f"- {finding}" for finding in findings)
+    return (
+        f"Local validation rejected your {role_id} result. Correct only the listed "
+        "problems, preserve valid decisions, and return the complete structured output "
+        f"again.\n\nFindings:\n{bullets}"
+    )
+
+
 def run_role(
-    role_id: str, prompt: str, context: dict[str, Any], schema: dict[str, Any] | None = None
+    role_id: str,
+    prompt: str,
+    context: dict[str, Any],
+    schema: dict[str, Any] | None = None,
+    *,
+    semantic_validator: SemanticValidator | None = None,
+    max_feedback_rounds: int = 0,
 ) -> dict[str, Any]:
     """Run one role with one backend, validating and retrying once."""
     selected = schema or _schema(role_id)
@@ -77,8 +100,13 @@ def run_role(
     if backend != "devin":
         raise ValueError("Palantum agent roles require the Devin backend")
 
+    if max_feedback_rounds not in {0, 1}:
+        raise ValueError("Palantum supports at most one autonomous feedback round")
+
     last_error = ""
     session_url: str | None = None
+    result: Any = None
+    output: dict[str, Any] = {}
     _record_session(context, role_id, "running")
     for attempt in range(2):
         attempt_context = dict(context)
@@ -107,9 +135,45 @@ def run_role(
             raise
         try:
             _validate(role_id, output)
-            _record_session(context, role_id, "done", session_url)
-            return output
+            break
         except ValueError as error:
             last_error = str(error)
-    _record_session(context, role_id, "failed", session_url)
-    raise ValueError(last_error)
+    else:
+        _record_session(context, role_id, "failed", session_url)
+        raise ValueError(last_error)
+
+    findings = semantic_validator(output) if semantic_validator is not None else []
+    reasoning_details: dict[str, Any] = {}
+    if findings:
+        if max_feedback_rounds == 0:
+            _record_session(context, role_id, "failed", session_url)
+            raise ValueError(f"{role_id} semantic validation failed: {findings[0]}")
+        reasoning_details = {
+            "reasoning_steps": 2,
+            "validation_findings": findings,
+        }
+        _record_session(context, role_id, "revising", session_url, reasoning_details)
+        try:
+            from palantum.agents.backends.devin import continue_session
+
+            result = continue_session(
+                role_id,
+                result.session_id,
+                result.url,
+                _feedback_message(role_id, findings),
+            )
+            output = result.output
+            session_url = result.url
+            _validate(role_id, output)
+            remaining = semantic_validator(output) if semantic_validator is not None else []
+            if remaining:
+                raise ValueError(
+                    f"{role_id} semantic validation failed after one revision: "
+                    f"{remaining[0]}"
+                )
+        except Exception:
+            _record_session(context, role_id, "failed", session_url, reasoning_details)
+            raise
+
+    _record_session(context, role_id, "done", session_url, reasoning_details)
+    return output

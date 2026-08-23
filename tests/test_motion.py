@@ -86,7 +86,12 @@ def test_catalog_scans_folder_and_reuses_hash_cache(tmp_path: Path) -> None:
     assert first["scenes"][0]["slots"][0]["default"] == "Default"
     assert first["scenes"][0]["slots"][0]["max_chars"] >= len("Default")
     assert first["scenes"][0]["presentation"] == "inset"
+    assert first["scenes"][0]["content_kind"] == "structured"
+    assert first["scenes"][0]["min_visible_s"] == 4.5
     assert first["scenes"][0]["requires_numeric_claim"] is True
+    assert next(scene for scene in first["scenes"] if scene["id"] == "brand-statement")[
+        "content_kind"
+    ] == "text"
 
 
 def test_catalog_scans_prefixed_zip_and_marks_broken_source(tmp_path: Path) -> None:
@@ -143,6 +148,19 @@ def test_materialize_creates_isolated_harness_and_validates_props(tmp_path: Path
     assert "scale(0.29250000)" in root
     assert "top: '76.80px'" in root
     assert "right: '43.20px'" in root
+
+    slowed = materialize_scene(
+        archive,
+        "flowchart",
+        edit,
+        {"title": "Process"},
+        slot_id="flow-01",
+        render_duration_s=4.5,
+    )
+    slowed_root = (slowed / "src/Root.tsx").read_text()
+    assert "const OUTPUT_DURATION_FRAMES = 135;" in slowed_root
+    assert "const HOLD_FRAMES = 30;" in slowed_root
+    assert "<Freeze frame={sourceFrame}>" in slowed_root
 
     with pytest.raises(ValueError, match="undeclared"):
         materialize_scene(archive, "hero-stat-callout", edit, {"other": "value"})

@@ -82,6 +82,7 @@ def materialize_scene(
     target_width: int | None = None,
     target_height: int | None = None,
     presentation: str | None = None,
+    render_duration_s: float | None = None,
 ) -> Path:
     """Copy one curated scene into an isolated, renderable edit/animations slot."""
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", scene_id):
@@ -109,6 +110,13 @@ def materialize_scene(
     component_name = str(scene["component_name"])
     scene_width = int(scene["width"])
     scene_height = int(scene["height"])
+    fps = int(scene["fps"])
+    source_duration_frames = int(scene["duration_in_frames"])
+    render_duration_frames = max(
+        source_duration_frames,
+        int(round((render_duration_s or float(scene["duration_s"])) * fps)),
+    )
+    hold_frames = fps if scene.get("content_kind") == "structured" else 0
     target_width = target_width or scene_width
     target_height = target_height or scene_height
     if target_width <= 0 or target_height <= 0:
@@ -136,33 +144,50 @@ def materialize_scene(
       transform: 'scale({scale:.8f})',
       transformOrigin: 'center center',"""
     root = f"""import React from 'react';
-import {{AbsoluteFill, Composition}} from 'remotion';
+import {{AbsoluteFill, Composition, Freeze, useCurrentFrame}} from 'remotion';
 import props from '../props.json';
 import {{{component_name}}} from './Composition';
 
-const SceneCanvas: React.FC = () => (
-  <AbsoluteFill style={{{{
+const SOURCE_DURATION_FRAMES = {source_duration_frames};
+const OUTPUT_DURATION_FRAMES = {render_duration_frames};
+const HOLD_FRAMES = {hold_frames};
+
+const SceneCanvas: React.FC = () => {{
+  const frame = useCurrentFrame();
+  const playbackFrames = Math.max(
+    SOURCE_DURATION_FRAMES,
+    OUTPUT_DURATION_FRAMES - HOLD_FRAMES,
+  );
+  const sourceFrame = Math.min(
+    SOURCE_DURATION_FRAMES - 1,
+    Math.floor((frame * SOURCE_DURATION_FRAMES) / playbackFrames),
+  );
+  return (
+    <Freeze frame={{sourceFrame}}>
+      <AbsoluteFill style={{{{
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   }}}}>
-    <div style={{{{
-    width: {scene_width},
-    height: {scene_height},
+        <div style={{{{
+          width: {scene_width},
+          height: {scene_height},
 {container_style}
-      overflow: 'hidden',
-    }}}}>
-      <{component_name} {{...props}} />
-    </div>
-  </AbsoluteFill>
-);
+          overflow: 'hidden',
+        }}}}>
+          <{component_name} {{...props}} />
+        </div>
+      </AbsoluteFill>
+    </Freeze>
+  );
+}};
 
 export const RemotionRoot: React.FC = () => (
   <Composition
     id="Scene"
     component={{SceneCanvas}}
-    durationInFrames={{{int(scene["duration_in_frames"])}}}
-    fps={{{int(scene["fps"])}}}
+    durationInFrames={{OUTPUT_DURATION_FRAMES}}
+    fps={{{fps}}}
     width={{{target_width}}}
     height={{{target_height}}}
   />

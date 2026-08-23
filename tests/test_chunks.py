@@ -11,6 +11,7 @@ import pytest
 from palantum.agents.backends.devin import DEVIN_PROMPT_BUDGET_CHARS, serialize_prompt
 from palantum.engine.videouse import ProbeResult
 from palantum.orchestrator import (
+    _a4_range_findings,
     _budgeted_a4_context,
     _compact_word_index,
     _recommend_chunk_variant,
@@ -124,6 +125,37 @@ def test_a4_context_reports_minimal_prompt_that_cannot_fit_budget() -> None:
         _budgeted_a4_context(base, "cut", beat="HOOK")
 
 
+def test_a4_range_findings_cover_order_source_interval_and_duration() -> None:
+    findings = _a4_range_findings(
+        {
+            "ranges": [
+                {
+                    "source": "unknown",
+                    "start": 2.0,
+                    "end": 1.0,
+                    "beat": "PROBLEM",
+                },
+                {
+                    "source": "take",
+                    "start": 3.0,
+                    "end": 4.0,
+                    "beat": "HOOK",
+                },
+            ],
+            "total_duration_s": 9.0,
+        },
+        allowed_beats=["HOOK", "PROBLEM"],
+        allowed_sources={"take"},
+    )
+
+    assert findings == [
+        "range 0 uses unknown source unknown",
+        "range 0 has invalid interval 2-1",
+        "range 1 puts beat HOOK out of Director order",
+        "total_duration_s does not match the sum of the selected ranges (9 vs 1)",
+    ]
+
+
 def _state(edit_dir: Path, source: Path) -> None:
     (edit_dir / "coverage.json").write_text(
         json.dumps(
@@ -206,6 +238,7 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
     maximum = 0
     lock = threading.Lock()
     role_calls: list[str] = []
+    reasoned_a4_calls: list[str] = []
 
     def cached_role(
         _edit_dir: Path,
@@ -215,9 +248,14 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
         context: dict[str, object],
         *,
         resume: bool,
+        **kwargs: object,
     ) -> dict[str, object]:
         del resume
         role_calls.append(cache_key)
+        if cache_key.startswith("A4"):
+            assert callable(kwargs["semantic_validator"])
+            assert kwargs["max_feedback_rounds"] == 1
+            reasoned_a4_calls.append(cache_key)
         if cache_key == "A4-chunk-plan":
             return {"ranges": seed, "total_duration_s": 4.0, "notes": "plan"}
         if cache_key.startswith("A5-"):
@@ -267,6 +305,15 @@ def test_build_chunk_variants_creates_two_options_in_parallel(tmp_path: Path) ->
     persisted = json.loads((edit_dir / "chunks.json").read_text(encoding="utf-8"))
 
     assert manifest["status"] == "review"
+    assert sorted(reasoned_a4_calls) == sorted(
+        [
+            "A4-chunk-plan",
+            "A4-chunk-00-hook-a",
+            "A4-chunk-00-hook-b",
+            "A4-chunk-01-problem-a",
+            "A4-chunk-01-problem-b",
+        ]
+    )
     assert manifest["generation_id"]
     assert persisted_before_a5 == manifest
     assert persisted == manifest

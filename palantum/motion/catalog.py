@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
-CATALOG_SCHEMA_VERSION = 2
-CURATION_VERSION = 2
+CATALOG_SCHEMA_VERSION = 3
+CURATION_VERSION = 3
 
 # This is deliberately a small allowlist. The original template sources remain in the
 # user-supplied pack and are not redistributed with Palantum.
@@ -19,6 +19,8 @@ CURATED_SCENES: dict[str, dict[str, Any]] = {
         "beat_type": "PROBLEM",
         "confidence": 0.95,
         "presentation": "inset",
+        "content_kind": "structured",
+        "min_visible_s": 4.5,
         "requires_numeric_claim": True,
         "fixed_text_color": "#171717",
         "max_chars": {"heroValue": 12, "heroLabel": 40, "stats": 120, "bgColor": 32},
@@ -26,31 +28,43 @@ CURATED_SCENES: dict[str, dict[str, Any]] = {
     "bar-chart-reveal": {
         "beat_type": "PROBLEM",
         "confidence": 0.9,
+        "content_kind": "structured",
+        "min_visible_s": 4.5,
         "max_chars": {"title": 48, "barLabels": 120, "barValues": 80},
     },
     "step-explainer": {
         "beat_type": "SOLUTION",
         "confidence": 0.95,
+        "content_kind": "structured",
+        "min_visible_s": 4.5,
         "max_chars": {"title": 48, "steps": 180},
     },
     "flowchart": {
         "beat_type": "SOLUTION",
         "confidence": 0.9,
+        "content_kind": "structured",
+        "min_visible_s": 4.5,
         "max_chars": {"title": 48, "steps": 240},
     },
     "screen-showcase": {
         "beat_type": "DEMO",
         "confidence": 0.9,
+        "content_kind": "structured",
+        "min_visible_s": 4.5,
         "max_chars": {"title": 40, "features": 160, "bgColor": 32},
     },
     "ui-walkthrough": {
         "beat_type": "DEMO",
         "confidence": 0.9,
+        "content_kind": "structured",
+        "min_visible_s": 4.5,
         "max_chars": {"stepLabels": 120, "textColor": 32},
     },
     "saas-metrics-board": {
         "beat_type": "TRACTION",
         "confidence": 0.95,
+        "content_kind": "structured",
+        "min_visible_s": 4.5,
         "max_chars": {
             "title": 48,
             "labels": 120,
@@ -62,6 +76,7 @@ CURATED_SCENES: dict[str, dict[str, Any]] = {
     "brand-statement": {
         "beat_type": "ASK",
         "confidence": 0.6,
+        "content_kind": "text",
         "max_chars": {
             "statement": 100,
             "highlight": 32,
@@ -248,6 +263,8 @@ def _scene(reader: PackReader, entry: dict[str, Any], curated: dict[str, Any]) -
         "beat_type": str(curated["beat_type"]),
         "confidence": float(curated["confidence"]),
         "presentation": str(curated.get("presentation", "overlay")),
+        "content_kind": str(curated.get("content_kind", "text")),
+        "min_visible_s": float(curated.get("min_visible_s", 0)),
         "requires_numeric_claim": bool(curated.get("requires_numeric_claim", False)),
         "fixed_text_color": curated.get("fixed_text_color"),
         "engine": "remotion",

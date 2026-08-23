@@ -7,7 +7,12 @@ from unittest.mock import call as mock_call
 import pytest
 import requests
 
-from palantum.agents.backends.devin import DEVIN_PROMPT_LIMIT_CHARS, call, serialize_prompt
+from palantum.agents.backends.devin import (
+    DEVIN_PROMPT_LIMIT_CHARS,
+    call,
+    continue_session,
+    serialize_prompt,
+)
 
 
 def _response(
@@ -97,6 +102,56 @@ def test_finished_session_returns_structured_output_and_creation_url() -> None:
         "https://api.devin.ai/v1/sessions/session-a1",
         headers={"Authorization": "Bearer key", "Content-Type": "application/json"},
         timeout=30,
+    )
+
+
+@pytest.mark.parametrize(
+    ("environment", "message_url"),
+    [
+        (
+            {"DEVIN_API_KEY": "apk_legacy"},
+            "https://api.devin.ai/v1/sessions/session-a4/message",
+        ),
+        (
+            {"DEVIN_PAT": "cog_service", "DEVIN_ORG_ID": "org-video"},
+            "https://api.devin.ai/v3/organizations/org-video/sessions/session-a4/messages",
+        ),
+    ],
+)
+def test_continue_session_sends_one_feedback_message_and_polls_existing_session(
+    environment: dict[str, str], message_url: str
+) -> None:
+    environment["PALANTUM_DEVIN_POLL_INTERVAL_S"] = "0"
+    revised = _response(
+        {
+            "status_enum": "finished",
+            "status": "running",
+            "status_detail": "finished",
+            "structured_output": {"ranges": [{"beat": "HOOK"}]},
+        }
+    )
+    with (
+        patch.dict("os.environ", environment, clear=True),
+        patch("palantum.agents.backends.devin.requests.post", return_value=_response({})) as post,
+        patch("palantum.agents.backends.devin.requests.get", return_value=revised),
+    ):
+        result = continue_session(
+            "A4",
+            "session-a4",
+            "https://app.devin.ai/sessions/session-a4",
+            "Fix the range.",
+        )
+
+    assert result.output == {"ranges": [{"beat": "HOOK"}]}
+    token = environment.get("DEVIN_PAT") or environment["DEVIN_API_KEY"]
+    post.assert_called_once_with(
+        message_url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        json={"message": "Fix the range."},
+        timeout=60,
     )
 
 

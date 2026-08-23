@@ -12,6 +12,8 @@ approved for this A/B comparison and its adapted type already matches the chunk 
 
 Timing rules:
 - Place an overlay inside the output interval of its beat.
+- Scenes marked `content_kind: structured` contain shapes or diagrams. Keep them visible for at
+  least `min_visible_s` and start them early enough to fit that reading time inside the beat.
 - Never exceed the final timeline duration.
 - Preserve at least one second on the final animation frame when the scene duration allows it.
 - Do not overlap independent overlays.
