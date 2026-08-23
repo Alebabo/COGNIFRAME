@@ -89,7 +89,7 @@ def test_finished_session_returns_structured_output_and_creation_url() -> None:
     delete.assert_not_called()
     payload = post.call_args.kwargs["json"]
     assert payload["snapshot_id"] == "snapshot-video-use"
-    assert payload["title"] == "Pitchcraft A1 · run 3"
+    assert payload["title"] == "PitchCraft A1 · run 3"
     assert payload["tags"] == ["run-3", "A1"]
     assert payload["max_acu_limit"] == 7
     post.assert_called_once_with(

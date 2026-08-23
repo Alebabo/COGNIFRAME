@@ -247,7 +247,7 @@ def call(
         "prompt": serialized_prompt,
         "structured_output_schema": schema,
         "tags": [f"run-{run_number}", role_id],
-        "title": f"Pitchcraft {role_id} · run {run_number}",
+        "title": f"PitchCraft {role_id} · run {run_number}",
         "max_acu_limit": int(os.getenv(f"PITCHCRAFT_{role_id}_MAX_ACU", "5")),
     }
     snapshot_id = os.getenv("DEVIN_SNAPSHOT_ID")

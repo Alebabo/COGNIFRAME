@@ -98,10 +98,10 @@ def run_role(
     selected = schema or _schema(role_id)
     backend = os.getenv("PITCHCRAFT_AGENT_BACKEND", "devin").lower()
     if backend != "devin":
-        raise ValueError("Pitchcraft agent roles require the Devin backend")
+        raise ValueError("PitchCraft agent roles require the Devin backend")
 
     if max_feedback_rounds not in {0, 1}:
-        raise ValueError("Pitchcraft supports at most one autonomous feedback round")
+        raise ValueError("PitchCraft supports at most one autonomous feedback round")
 
     last_error = ""
     session_url: str | None = None

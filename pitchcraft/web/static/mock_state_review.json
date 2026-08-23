@@ -17,21 +17,21 @@
       "recommendation": {
         "status": "ready",
         "variant_id": "b",
-        "reason": "The motion version delivers the opening more precisely and cleanly."
+        "reason": "The motion version delivers a more precise and technically polished opening."
       },
       "variants": [
         {
           "id": "a",
           "label": "Version A",
           "name": "Clean Cut",
-          "strategy": "Calmer opening with a natural pause and focus on the speaker.",
+          "strategy": "A calm opening with a natural pause and focus on the speaker.",
           "video_url": "/api/video"
         },
         {
           "id": "b",
           "label": "Version B",
           "name": "Motion Cut",
-          "strategy": "Tighter opening with a faster rhythm and room for UI motion.",
+          "strategy": "A tighter opening with a faster rhythm and room for UI motion.",
           "video_url": "/api/video"
         }
       ]
@@ -58,7 +58,7 @@
           "id": "b",
           "label": "Version B",
           "name": "Motion Cut",
-          "strategy": "Compact explanation with an integrated product interface and motion cards.",
+          "strategy": "A concise explanation with an integrated product interface and motion cards.",
           "video_url": "/api/video"
         }
       ]

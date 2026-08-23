@@ -1,4 +1,4 @@
-# COGNIFRAME / Pitchcraft — implemented architecture
+# COGNIFRAME / PitchCraft — implemented architecture
 
 COGNIFRAME is an autonomous pitch-video production layer on top of the Devin API. `pitchcraft` is
 the package name. Devin sessions make semantic editorial decisions; a deterministic Python state

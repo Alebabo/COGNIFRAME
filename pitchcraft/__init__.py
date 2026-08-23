@@ -1,1 +1,1 @@
-"""Pitchcraft director layer."""
+"""PitchCraft director layer."""

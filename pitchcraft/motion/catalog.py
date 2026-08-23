@@ -13,7 +13,7 @@ CATALOG_SCHEMA_VERSION = 3
 CURATION_VERSION = 3
 
 # This is deliberately a small allowlist. The original template sources remain in the
-# user-supplied pack and are not redistributed with Pitchcraft.
+# user-supplied pack and are not redistributed with PitchCraft.
 CURATED_SCENES: dict[str, dict[str, Any]] = {
     "hero-stat-callout": {
         "beat_type": "PROBLEM",

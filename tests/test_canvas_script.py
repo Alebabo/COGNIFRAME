@@ -66,8 +66,16 @@ def test_build_canvas_metadata_is_local_and_returns_isolated_defaults() -> None:
     first["agent_cursors"][0]["beat"] = "ASK"
 
     assert second["beats"]["HOOK"] == ""
+    assert second["title"] == "My Startup Pitch"
     assert second["beat_info"]["HOOK"]["title"] == "Hook"
+    assert second["beat_info"]["SOLUTION"]["title"] == "Solution"
     assert second["agent_cursors"][0]["beat"] == "HOOK"
+
+
+def test_canvas_improvements_and_generated_scripts_are_requested_in_english() -> None:
+    assert "Always write message and ghost_text in English" in script_module._ORCHESTRATION_PROMPT
+    assert "Always write message and ghost_text in English" in script_module._ASSIST_PROMPT
+    assert "Write the complete script in English" in script_module._SCRIPT_PROMPT
 
 
 def test_orchestrate_canvas_uses_one_devin_call_and_normalizes_ghosts() -> None:

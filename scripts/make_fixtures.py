@@ -11,7 +11,7 @@ from pathlib import Path
 
 TAKES = {
     "take_1": (
-        "Two hours of browser-test triage become two minutes with Pitchcraft. "
+        "Two hours of browser-test triage become two minutes with PitchCraft. "
         "Developers lose time when flaky browser tests delay releases and frustrate customers."
     ),
     "take_2": (
@@ -24,7 +24,7 @@ TAKES = {
     ),
 }
 TRACTION = "In the last three months, 120 teams joined our beta and cut triage time in half."
-DEMO = "Pitchcraft groups every failing run by root cause, so one click opens the exact fix."
+DEMO = "PitchCraft groups every failing run by root cause, so one click opens the exact fix."
 
 
 def tts(text: str, destination: Path) -> None:

@@ -4,10 +4,10 @@
     "score": 0.57,
     "beats": [
       { "id": "HOOK", "status": "covered", "reason": "Concrete statement in 0.4s, no intro." },
-      { "id": "PROBLEM", "status": "covered", "reason": "Names the affected user and the cost." },
-      { "id": "SOLUTION", "status": "weak", "reason": "Describes value, not mechanism." },
+      { "id": "PROBLEM", "status": "covered", "reason": "Names who is affected and the cost." },
+      { "id": "SOLUTION", "status": "weak", "reason": "Describes the benefit, not the mechanism." },
       { "id": "DEMO", "status": "missing", "reason": "No visual product footage in the source material." },
-      { "id": "TRACTION", "status": "missing", "reason": "No spoken number in any take." },
+      { "id": "TRACTION", "status": "missing", "reason": "No spoken number appears in any take." },
       { "id": "TEAM", "status": "covered", "reason": "Names people with an unfair advantage." },
       { "id": "ASK", "status": "weak", "reason": "Call to action without an object." }
     ]
@@ -29,24 +29,24 @@
       "beat": "DEMO",
       "impact": "high",
       "resolved": false,
-      "why": "You describe the product, but it is never shown. Without a visual, the claim remains unsubstantiated.",
+      "why": "You describe the product, but never show it. Without an image, the claim remains unsubstantiated.",
       "shot": {
-        "line": "Screen recording: start a run and show how the agent makes the edit — no commentary.",
-        "framing": "Screen recording 1080x1920, window without tabs or notifications",
+        "line": "Screen recording: start a run and show the agent making the cut—without commentary.",
+        "framing": "1080x1920 screen recording, window without tabs or notifications",
         "duration_s": 12,
-        "delivery": "No narration, just movement. No cursor shake."
+        "delivery": "No narration, only movement. Keep the cursor steady."
       }
     },
     {
       "beat": "ASK",
       "impact": "medium",
       "resolved": false,
-      "why": "“Get in touch” has no object — nobody knows what to do.",
+      "why": "“Get in touch” has no object—nobody knows what to do.",
       "shot": {
         "line": "Say verbatim: “If you invest in developer tools, reply to this email.”",
-      "framing": "Same setup as Take C0103, medium shot",
+        "framing": "Same setup as Take C0103, medium shot",
         "duration_s": 4,
-        "delivery": "Look directly into the camera, one sentence, then silence."
+        "delivery": "Look directly into the camera, say one sentence, then hold still."
       }
     },
     {
@@ -55,8 +55,8 @@
       "resolved": true,
       "why": "Closed by Take C0107.",
       "shot": {
-        "line": "Say who suffers and what it costs them — not the category.",
-      "framing": "Same setup as Take C0103, medium shot",
+        "line": "Say who suffers and what it costs them—not the category.",
+        "framing": "Same setup as Take C0103, medium shot",
         "duration_s": 8,
         "delivery": "Matter-of-fact."
       }

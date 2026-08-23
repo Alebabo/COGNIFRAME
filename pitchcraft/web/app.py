@@ -365,7 +365,7 @@ def _selection_complete(chunks: Any) -> bool:
 def _failure_message(error: Exception) -> str:
     missing = str(error).strip("'") if isinstance(error, KeyError) else ""
     if missing in {"OPENAI_API_KEY", "DEVIN_API_KEY", "DEVIN_PAT"}:
-        return f"{missing} is missing. Configure the key in .env."
+        return f"{missing} is missing. Configure the key in the .env file."
     detail = str(error).strip()
     return f"{type(error).__name__}: {detail}" if detail else type(error).__name__
 
@@ -547,7 +547,7 @@ def _raise_canvas_error(error: Exception) -> NoReturn:
         raise HTTPException(status_code=503, detail=str(error)) from error
     if isinstance(error, CanvasAgentResponseError):
         raise HTTPException(
-            status_code=502, detail="Devin returned no valid recommendation."
+            status_code=502, detail="Devin did not return a valid recommendation."
         ) from error
     raise error
 
@@ -558,7 +558,7 @@ def _transcribe_with_whisper(path: Path, api_key: str) -> str:
 
     with path.open("rb") as audio_handle:
         transcript = OpenAI(api_key=api_key).audio.transcriptions.create(
-            model="whisper-1", file=audio_handle, language="en"
+            model="whisper-1", file=audio_handle
         )
     return str(transcript.text)
 
@@ -569,7 +569,7 @@ def create_app(
     root = Path(videos_dir).resolve()
     resolved_template = Path(template_source).resolve() if template_source else None
     root.mkdir(parents=True, exist_ok=True)
-    app = FastAPI(title="Pitchcraft")
+    app = FastAPI(title="PitchCraft")
 
     @app.exception_handler(CanvasPersistenceError)
     async def canvas_persistence_error(

@@ -92,7 +92,7 @@ def test_background_failure_is_exposed_in_state(tmp_path: Path) -> None:
 
     assert result["phase"] == "error"
     assert result["job_status"] == "failed"
-    assert result["error"] == "OPENAI_API_KEY is missing. Configure the key in .env."
+    assert result["error"] == "OPENAI_API_KEY is missing. Configure the key in the .env file."
 
 
 def test_state_payload_exposes_precise_video_job_status(tmp_path: Path) -> None:
@@ -322,7 +322,7 @@ def test_stale_a5_batch_cannot_mutate_a_newer_manifest(tmp_path: Path) -> None:
 def test_a5_merge_preserves_a_concurrent_manual_selection(tmp_path: Path) -> None:
     edit = tmp_path / "edit"
     edit.mkdir()
-    manifest: dict[str, Any] = {
+    manifest = {
         "generation_id": "generation-concurrent",
         "chunks": [
             {"id": "one", "selected": None, "variants": [{"id": "a"}, {"id": "b"}]}
@@ -365,7 +365,7 @@ def test_a5_merge_preserves_a_concurrent_manual_selection(tmp_path: Path) -> Non
 def test_a5_batch_is_skipped_after_job_leaves_review(tmp_path: Path) -> None:
     edit = tmp_path / "edit"
     edit.mkdir()
-    manifest: dict[str, Any] = {
+    manifest = {
         "generation_id": "generation-finalizing",
         "chunks": [
             {"id": "one", "selected": "a", "variants": [{"id": "a"}, {"id": "b"}]}
@@ -452,7 +452,10 @@ def test_frontend_exposes_canvas_agent_status_and_actions(tmp_path: Path) -> Non
     assert 'id="toolbar"' in response.text
     assert 'id="mic"' in response.text
     assert 'id="generate"' in response.text
-    assert 'class="corner-logo"' in response.text
+    assert '<html lang="en">' in response.text
+    assert "<title>PitchCraft</title>" in response.text
+    assert '<img class="brand-logo" src="pitchcraft-logo.png" alt="PitchCraft">' in response.text
+    assert 'class="corner-logo"' not in response.text
     assert 'id="chunk-review"' in response.text
     assert 'id="finalize"' in response.text
     assert 'id="apply-recommendations"' in response.text
@@ -475,6 +478,25 @@ def test_frontend_exposes_canvas_agent_status_and_actions(tmp_path: Path) -> Non
     assert "state.seenRequestIds.has(responseId)" in response.text
     assert "data.recommendations_status === 'pending'" in response.text
     assert "state.uploading || state.pollingRecommendations" in response.text
+
+
+def test_frontend_keeps_pitchcraft_logo_top_left_and_ui_copy_in_english(
+    tmp_path: Path,
+) -> None:
+    html = TestClient(create_app(tmp_path)).get("/").text
+    topbar = html.split('<header class="topbar">', 1)[1].split("</header>", 1)[0]
+
+    assert topbar.index('class="brand"') < topbar.index('class="agents-nav"')
+    assert '<img class="brand-logo" src="pitchcraft-logo.png" alt="PitchCraft">' in topbar
+    assert ".topbar {" in html
+    assert "top: 0;" in html
+    assert "left: 0;" in html
+    assert ".brand-logo {" in html
+    assert "object-position: left center;" in html
+    assert "Improvement suggestion" in html
+    assert ">Generate</button>" in html
+    assert ">Create video</button>" in html
+    assert "AI recommendation unavailable" in html
 
 
 def test_frontend_defers_job_ui_until_video_processing_is_running(tmp_path: Path) -> None:
@@ -806,7 +828,7 @@ def test_selection_cannot_make_a_finished_master_stale(tmp_path: Path) -> None:
     assert json.loads(path.read_text(encoding="utf-8"))["chunks"][0]["selected"] == "a"
 
 
-def test_frontend_serves_corner_logo(tmp_path: Path) -> None:
+def test_frontend_serves_pitchcraft_logo(tmp_path: Path) -> None:
     response = TestClient(create_app(tmp_path)).get("/pitchcraft-logo.png")
 
     assert response.status_code == 200
@@ -814,7 +836,7 @@ def test_frontend_serves_corner_logo(tmp_path: Path) -> None:
 
 
 def test_whisper_call_is_offloaded_from_async_request_loop(tmp_path: Path) -> None:
-    worker = AsyncMock(return_value="Transkribierter Text")
+    worker = AsyncMock(return_value="Transcribed text")
     client = TestClient(create_app(tmp_path))
 
     with (
@@ -827,7 +849,7 @@ def test_whisper_call_is_offloaded_from_async_request_loop(tmp_path: Path) -> No
         )
 
     assert response.status_code == 200
-    assert response.json() == {"text": "Transkribierter Text"}
+    assert response.json() == {"text": "Transcribed text"}
     assert worker.await_args is not None
     function, _temporary, api_key = worker.await_args.args
     assert function is _transcribe_with_whisper

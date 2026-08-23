@@ -13,44 +13,44 @@ BEAT_DEFAULTS = {
     "HOOK": {
         "title": "Hook",
         "time": "3–6s",
-        "description": "First 1.5s with a concrete, compelling statement. No greeting.",
-        "placeholder": "Formulate your thesis or compelling opening...",
+        "description": "Open with a concrete, compelling statement in the first 1.5s. No greeting.",
+        "placeholder": "State your thesis or write a compelling opening...",
     },
     "PROBLEM": {
         "title": "Problem",
         "time": "6–10s",
-        "description": "Who suffers from the pain, and what does it really cost?",
-        "placeholder": "Describe the target audience’s concrete challenge...",
+        "description": "Who experiences the pain, and what does it really cost them?",
+        "placeholder": "Describe the target audience's concrete problem...",
     },
     "SOLUTION": {
         "title": "Solution",
         "time": "8–14s",
-        "description": "The concrete mechanism — how exactly does the solution work?",
-        "placeholder": "Explain your solution’s unique mechanism...",
+        "description": "Explain the concrete mechanism—how does the solution work?",
+        "placeholder": "Explain the unique mechanism behind your solution...",
     },
     "DEMO": {
         "title": "Demo & Visuals",
         "time": "8–15s",
-        "description": "Visible product footage or UI walkthrough.",
-        "placeholder": "Show or describe the product in real-world use...",
+        "description": "Show visible product footage or a UI walkthrough.",
+        "placeholder": "Show or describe the product in real use...",
     },
     "TRACTION": {
         "title": "Traction & Metrics",
         "time": "4–8s",
-        "description": "At least one concrete number with a clear time reference.",
-        "placeholder": "Name measurable users, revenue, or growth...",
+        "description": "Include at least one concrete metric with a clear timeframe.",
+        "placeholder": "Add measurable users, revenue, or growth...",
     },
     "TEAM": {
         "title": "Team",
         "time": "3–6s",
-        "description": "Names and the decisive 'unfair advantage'.",
-        "placeholder": "Describe the distinctive background and core expertise...",
+        "description": "Name the team and its decisive unfair advantage.",
+        "placeholder": "Describe the team's distinctive background and core expertise...",
     },
     "ASK": {
         "title": "Call to Action",
         "time": "3–5s",
-        "description": "Clear call to action with a concrete goal.",
-        "placeholder": "Formulate a clear call to action for the target audience...",
+        "description": "End with a clear call to action and a concrete goal.",
+        "placeholder": "Write a clear call to action for the target audience...",
     },
 }
 
@@ -92,10 +92,8 @@ _BEAT_ALIASES = {
 }
 _BEAT_HEADER = re.compile(
     r"^(?:(?:0?[1-7])(?:[.)]|\s*[-:])?\s+)?"
-    r"\[?(?P<beat>HOOK|PROBLEM|SOLUTION|DEMO|"
-    r"TRACTION|TEAM|ASK|CTA)\]?"
-    r"(?:\s*/\s*(?:HOOK|PROBLEM|SOLUTION|DEMO|"
-    r"TRACTION|TEAM|ASK|CTA))?"
+    r"\[?(?P<beat>HOOK|PROBLEM|SOLUTION|DEMO|TRACTION|TEAM|ASK|CTA)\]?"
+    r"(?:\s*/\s*(?:HOOK|PROBLEM|SOLUTION|DEMO|TRACTION|TEAM|ASK|CTA))?"
     r"(?:\s*[:—-]\s*|\s+|$)(?P<body>.*)$",
     re.IGNORECASE,
 )
@@ -173,7 +171,7 @@ SCRIPT_SCHEMA: dict[str, Any] = {
     "properties": {"script": {"type": "string", "minLength": 1}},
 }
 
-_ORCHESTRATION_PROMPT = """You are the Pitchcraft canvas orchestrator. In one response, provide
+_ORCHESTRATION_PROMPT = """You are the PitchCraft canvas orchestrator. In one response, provide
 one independent contribution from each of these three agents: A2 Director, A3 Strategist, and
 A1 Supervisor. A2 improves the hook and visual direction; A3 challenges the problem, solution,
 and evidence; A1 protects timing, clarity, and the final call to action.
@@ -183,18 +181,21 @@ verbatim substring of INPUT JSON.text. Do not invent an anchor. Keep message con
 ghost_text is an optional continuation to insert immediately after anchor_text. Use an empty
 string when no wording is useful. Never repeat text already present in INPUT JSON.text or in
 accepted_ghost_texts. Continue an unfinished sentence with matching grammar and casing; after
-sentence-ending punctuation, begin a new sentence. Never invent metrics, customers, or facts."""
+sentence-ending punctuation, begin a new sentence. Always write message and ghost_text in English,
+even when the input uses another language. Never invent metrics, customers, or facts."""
 
-_ASSIST_PROMPT = """Act only as the requested Pitchcraft canvas agent and return the requested
+_ASSIST_PROMPT = """Act only as the requested PitchCraft canvas agent and return the requested
 JSON object. anchor_text must be a non-empty, case-sensitive, verbatim substring of INPUT
 JSON.text. Keep message concise. ghost_text, when non-empty, must be wording that can be inserted
 immediately after anchor_text without repeating current or accepted text. Preserve grammatical
-continuation and never invent metrics, customers, or facts."""
+continuation. Always write message and ghost_text in English, even when the input uses another
+language. Never invent metrics, customers, or facts."""
 
-_SCRIPT_PROMPT = """You are Pitchcraft's A1 Script Supervisor. Turn the supplied description into
+_SCRIPT_PROMPT = """You are PitchCraft's A1 Script Supervisor. Turn the supplied description into
 a concise, speakable startup video script of about 60 seconds. Use HOOK, PROBLEM, SOLUTION, DEMO,
 TRACTION, TEAM, and ASK sections. Do not invent numbers, customers, results, or product features;
-mark genuinely missing facts briefly in square brackets. Return only the structured JSON."""
+mark genuinely missing facts briefly in square brackets. Write the complete script in English,
+even when the description uses another language. Return only the structured JSON."""
 
 
 def parse_canvas_beats(text: str) -> dict[str, str]:

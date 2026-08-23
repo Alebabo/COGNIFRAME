@@ -497,7 +497,7 @@ def export_project(edit_dir: Path, output_parent: Path | None = None) -> Path:
     _write_otio(package_dir, clips, graphics, srt, fps)
     _write_edl(package_dir, clips, fps)
     (package_dir / "README.txt").write_text(
-        "This package is the editable Pitchcraft cut for "
+        "This package is the editable PitchCraft cut for "
         f"{project_name}.\n\n"
         "Open timeline.fcpxml in DaVinci Resolve or Final Cut Pro. "
         "timeline.otio and timeline.edl are fallbacks for other NLEs.\n"

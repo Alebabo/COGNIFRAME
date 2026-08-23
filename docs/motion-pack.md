@@ -10,7 +10,7 @@ pitchcraft cut --template-source "C:\path\to\templates.zip"
 The template path can instead be supplied once as `PITCHCRAFT_TEMPLATE_SOURCE`. Production agent
 decisions require `DEVIN_API_KEY`; `DEVIN_SNAPSHOT_ID` is optional.
 
-Pitchcraft does not redistribute the supplied Locomotion template sources. At runtime,
+PitchCraft does not redistribute the supplied Locomotion template sources. At runtime,
 `pitchcraft.motion.build_scene_catalog()` reads either the original ZIP or an extracted directory,
 hashes the complete source, and writes a cached `edit/scene-catalog.json` containing only the eight
 curated scene descriptions and slot defaults.
@@ -27,7 +27,7 @@ transparent, top-right inset; it is rejected if it remains too opaque. Known ful
 catalogued as insets from the start. The generated harness always renders at the detected delivery
 orientation, so landscape delivery remains 1920x1080 and portrait delivery is 1080x1920.
 
-Scenes containing charts, flows, UI, cards, or other shapes are catalogued as `structured`. Pitchcraft
+Scenes containing charts, flows, UI, cards, or other shapes are catalogued as `structured`. PitchCraft
 keeps them visible for at least 4.5 seconds when their beat permits, slows their animation when extra
 time is available, and preserves roughly one second on the final frame. Burned-in subtitles are
 removed only for the active motion intervals and return immediately afterwards.
