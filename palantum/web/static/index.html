@@ -100,7 +100,7 @@
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    width: 290px;
+    width: 280px;
     background: #ffffff;
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -125,18 +125,6 @@
     letter-spacing: 0.06em;
     color: var(--muted);
     margin-bottom: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .orchestrator-tag {
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    color: #166534;
-    font-weight: 500;
   }
   .agent-row {
     display: flex;
@@ -186,11 +174,11 @@
     width: 100%;
   }
 
-  /* Dual Layer: Real Textarea + Grey Verbatim Ghost Overlay */
-  .prompt, .ghost-overlay {
-    font-family: inherit;
+  /* Dual Layer: Real Textarea + Flowing Dynamic Display Layer */
+  .prompt, .canvas-display, #mirror {
+    font-family: Inter, -apple-system, system-ui, sans-serif;
     font-size: 24px;
-    line-height: 1.55;
+    line-height: 1.6;
     letter-spacing: -0.015em;
     padding: 0;
     margin: 0;
@@ -212,12 +200,15 @@
     outline: none;
     z-index: 2;
   }
+  .prompt.has-ghost {
+    color: transparent !important;
+  }
   .prompt::placeholder {
     color: #c4c6cb;
     font-weight: 400;
   }
 
-  .ghost-overlay {
+  .canvas-display {
     position: absolute;
     top: 0;
     left: 0;
@@ -225,13 +216,17 @@
     bottom: 0;
     min-height: 240px;
     pointer-events: none;
-    color: transparent;
+    color: var(--ink);
     z-index: 1;
     user-select: none;
+    display: none;
+  }
+  .canvas-display.visible {
+    display: block;
   }
   .ghost-text-grey {
     color: #9ca3af; /* True subtle grey autocomplete text */
-    opacity: 0.9;
+    opacity: 0.95;
     font-style: normal;
   }
 
@@ -248,22 +243,54 @@
   }
   .agent-cursor {
     position: absolute;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    transition: transform 380ms cubic-bezier(0.25, 1, 0.5, 1), opacity 240ms ease;
-    opacity: 0;
+    display: inline-block;
+    transition: transform 550ms cubic-bezier(0.16, 1, 0.3, 1), opacity 300ms ease;
+    opacity: 0.95;
     pointer-events: none;
-    z-index: 60;
+    z-index: 50;
+    top: 0;
+    left: 0;
     transform: translate(0, 0);
   }
   .agent-cursor.visible {
     opacity: 1;
     pointer-events: auto !important;
   }
+  .agent-cursor:hover,
+  .agent-cursor:has(:hover) {
+    z-index: 9999 !important;
+  }
+  .cursor-header-wrap {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    pointer-events: auto !important;
+    z-index: 60;
+  }
+  .cursor-header-wrap:hover {
+    z-index: 9999 !important;
+  }
+  .cursor-header {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: 0.02em;
+    user-select: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    white-space: nowrap;
+  }
   .cursor-caret {
     width: 2px;
-    height: 28px;
+    height: 32px;
     border-radius: 1px;
     animation: caretBlink 1.2s ease-in-out infinite;
   }
@@ -272,40 +299,101 @@
     50% { opacity: 0.25; }
   }
 
-  /* Floating Advice Box: Compact, elegant pill with ONLY the clean advice & close button */
+  /* Modern (i) Info Circle Badge with crisp sans-serif Inter typography */
+  .cursor-info-badge {
+    position: relative;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1.5px solid currentColor;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: Inter, -apple-system, sans-serif;
+    font-style: normal;
+    line-height: 1;
+    cursor: pointer !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    pointer-events: auto !important;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+    animation: popIn 180ms ease both;
+  }
+  .cursor-info-badge:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+    z-index: 9999 !important;
+  }
+
+  /* Agent Cursor Colors */
+  .agent-cursor.director .cursor-header { background: var(--director); }
+  .agent-cursor.director .cursor-caret { background: var(--director); }
+  .agent-cursor.director .cursor-info-badge { color: var(--director); }
+
+  .agent-cursor.strategist .cursor-header { background: var(--strategist); }
+  .agent-cursor.strategist .cursor-caret { background: var(--strategist); }
+  .agent-cursor.strategist .cursor-info-badge { color: var(--strategist); }
+
+  .agent-cursor.supervisor .cursor-header { background: var(--supervisor); }
+  .agent-cursor.supervisor .cursor-caret { background: var(--supervisor); }
+  .agent-cursor.supervisor .cursor-info-badge { color: var(--supervisor); }
+
+  /* Floating Advice Box: Dominant solid opaque white, auto-resizing with high elevation */
   .floating-advice {
     position: absolute;
     top: calc(100% + 6px);
     left: 0;
     display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 10px;
-    background: #ffffff;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #ffffff !important;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.09);
-    font-size: 12px;
-    line-height: 1.35;
+    border-radius: 8px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.18), 0 3px 8px rgba(0,0,0,0.06);
+    font-size: 12.5px;
+    line-height: 1.45;
     color: #374151;
-    max-width: 320px;
+    min-width: 220px;
+    max-width: 380px;
     width: max-content;
-    pointer-events: all !important;
+    height: auto;
+    box-sizing: border-box;
+    pointer-events: auto !important;
     cursor: default;
-    z-index: 100;
-    animation: popIn 180ms ease both;
+    z-index: 9999 !important;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: opacity 160ms ease, transform 160ms ease, visibility 160ms ease;
     user-select: none;
+    font-family: Inter, sans-serif;
+    font-style: normal;
   }
+  .cursor-info-badge:hover .floating-advice,
+  .floating-advice:hover {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    z-index: 9999 !important;
+  }
+
   @keyframes popIn {
-    from { opacity: 0; transform: translateY(4px) scale(0.97); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: scale(0.85); }
+    to { opacity: 1; transform: scale(1); }
   }
   .advice-text {
     flex: 1;
-    font-size: 12px;
-    color: #4b5563;
+    font-size: 12.5px;
+    color: #374151;
     font-weight: 400;
-    pointer-events: all !important;
+    line-height: 1.45;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    pointer-events: auto !important;
   }
   .advice-close {
     border: none;
@@ -317,7 +405,7 @@
     padding: 2px 6px;
     border-radius: 3px;
     flex-shrink: 0;
-    pointer-events: all !important;
+    pointer-events: auto !important;
     transition: color 150ms ease, background 150ms ease;
   }
   .advice-close:hover {
@@ -325,24 +413,12 @@
     background: #f3f4f6;
   }
 
-  /* Agent Cursor Caret Colors */
-  .agent-cursor.director .cursor-caret { background: var(--director); }
-  .agent-cursor.strategist .cursor-caret { background: var(--strategist); }
-  .agent-cursor.supervisor .cursor-caret { background: var(--supervisor); }
-
   /* Offscreen Mirror for coordinate calculation */
   #mirror {
     position: absolute;
     top: -9999px;
     left: -9999px;
     visibility: hidden;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    font-family: Inter, -apple-system, system-ui, sans-serif;
-    font-size: 24px;
-    line-height: 1.55;
-    letter-spacing: -0.015em;
-    box-sizing: border-box;
   }
 
   .attachment-list {
@@ -534,7 +610,7 @@
   }
   .reset:hover { color: var(--ink); }
 
-  /* Reverted Minimal Clean Toolbar */
+  /* Minimal Reverted Bottom Toolbar */
   .toolbar {
     position: fixed;
     bottom: 0;
@@ -613,7 +689,7 @@
   @media (max-width: 680px) {
     .topbar { padding: 0 16px; }
     main { width: calc(100% - 32px); padding-top: 96px; }
-    .prompt, .ghost-overlay { font-size: 20px; }
+    .prompt, .canvas-display, #mirror { font-size: 20px; }
     .toolbar { padding: 0 16px; }
     .actions { grid-template-columns: repeat(2, 1fr); }
   }
@@ -630,10 +706,7 @@
       <div class="agent-avatar supervisor" title="Supervisor">S</div>
     </div>
     <div class="agents-tooltip" id="agents-tooltip">
-      <div class="agents-tooltip-title">
-        <span>Devin Orchestrator</span>
-        <span class="orchestrator-tag" id="orchestrator-status">Bereit</span>
-      </div>
+      <div class="agents-tooltip-title">KI Agenten-Trio</div>
       <div class="agent-row">
         <div class="agent-row-dot" style="background: var(--director);"></div>
         <div class="agent-row-info">
@@ -661,39 +734,57 @@
 
 <main>
   <div class="canvas-wrapper">
-    <!-- Ghost Overlay: Displays grey verbatim text inline right inside the text flow -->
-    <div id="ghost-overlay" class="ghost-overlay" aria-hidden="true"></div>
+    <!-- Flowing Display Layer: Renders real text before + grey ghost text + real text after (natively shifted) -->
+    <div id="canvas-display" class="canvas-display" aria-hidden="true"></div>
 
     <!-- Active Textarea -->
     <textarea id="prompt" class="prompt" aria-label="Beschreibe dein Video" placeholder="Was möchtest du erzählen? Schreibe frei drauflos..."></textarea>
     
     <!-- Collaborative Dynamic Cursors & Floating Advice Layer -->
     <div class="cursors-layer" id="cursors-layer">
-      <!-- Director Cursor & Floating Advice -->
-      <div id="cursor-director" class="agent-cursor director">
-        <div class="cursor-caret"></div>
-        <div id="advice-director" class="floating-advice" style="display:none;">
-          <span class="advice-text" id="advice-text-director"></span>
-          <button type="button" class="advice-close" title="Hinweis schließen" onmousedown="dismissAdvice(event, 'director')" onclick="dismissAdvice(event, 'director')">×</button>
+      <!-- Director Cursor & (i) Info Badge -->
+      <div id="cursor-director" class="agent-cursor director visible">
+        <div class="cursor-header-wrap">
+          <div class="cursor-header">Director</div>
+          <div id="info-badge-director" class="cursor-info-badge" style="display:none;">
+            <span>i</span>
+            <div id="advice-director" class="floating-advice">
+              <span class="advice-text" id="advice-text-director"></span>
+              <button type="button" class="advice-close" onmousedown="dismissAdvice(event, 'director')" onclick="dismissAdvice(event, 'director')">×</button>
+            </div>
+          </div>
         </div>
+        <div class="cursor-caret"></div>
       </div>
 
-      <!-- Strategist Cursor & Floating Advice -->
-      <div id="cursor-strategist" class="agent-cursor strategist">
-        <div class="cursor-caret"></div>
-        <div id="advice-strategist" class="floating-advice" style="display:none;">
-          <span class="advice-text" id="advice-text-strategist"></span>
-          <button type="button" class="advice-close" title="Hinweis schließen" onmousedown="dismissAdvice(event, 'strategist')" onclick="dismissAdvice(event, 'strategist')">×</button>
+      <!-- Strategist Cursor & (i) Info Badge -->
+      <div id="cursor-strategist" class="agent-cursor strategist visible">
+        <div class="cursor-header-wrap">
+          <div class="cursor-header">Strategist</div>
+          <div id="info-badge-strategist" class="cursor-info-badge" style="display:none;">
+            <span>i</span>
+            <div id="advice-strategist" class="floating-advice">
+              <span class="advice-text" id="advice-text-strategist"></span>
+              <button type="button" class="advice-close" onmousedown="dismissAdvice(event, 'strategist')" onclick="dismissAdvice(event, 'strategist')">×</button>
+            </div>
+          </div>
         </div>
+        <div class="cursor-caret"></div>
       </div>
 
-      <!-- Supervisor Cursor & Floating Advice -->
-      <div id="cursor-supervisor" class="agent-cursor supervisor">
-        <div class="cursor-caret"></div>
-        <div id="advice-supervisor" class="floating-advice" style="display:none;">
-          <span class="advice-text" id="advice-text-supervisor"></span>
-          <button type="button" class="advice-close" title="Hinweis schließen" onmousedown="dismissAdvice(event, 'supervisor')" onclick="dismissAdvice(event, 'supervisor')">×</button>
+      <!-- Supervisor Cursor & (i) Info Badge -->
+      <div id="cursor-supervisor" class="agent-cursor supervisor visible">
+        <div class="cursor-header-wrap">
+          <div class="cursor-header">Supervisor</div>
+          <div id="info-badge-supervisor" class="cursor-info-badge" style="display:none;">
+            <span>i</span>
+            <div id="advice-supervisor" class="floating-advice">
+              <span class="advice-text" id="advice-text-supervisor"></span>
+              <button type="button" class="advice-close" onmousedown="dismissAdvice(event, 'supervisor')" onclick="dismissAdvice(event, 'supervisor')">×</button>
+            </div>
+          </div>
         </div>
+        <div class="cursor-caret"></div>
       </div>
     </div>
   </div>
@@ -770,8 +861,9 @@ const state = {
   orchestrateDebounce: null,
   dismissed: {},
   activeGhostText: '',
-  ghostAnchorIndex: -1,
   activeRecommendations: [],
+  inflight: false,
+  acceptedGhostTexts: new Set(),
 };
 
 // HTML escape helper
@@ -784,27 +876,6 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// Check Devin / Backend config on initial load
-async function checkInitialConfig() {
-  try {
-    const res = await fetch('/api/devin/config');
-    if (res.ok) {
-      const cfg = await res.json();
-      if (cfg.devin_configured) {
-        $('orchestrator-status').textContent = 'Aktiv (Devin)';
-        $('orchestrator-status').style.background = '#dcfce7';
-        $('orchestrator-status').style.borderColor = '#bbf7d0';
-        $('orchestrator-status').style.color = '#166534';
-      } else if (cfg.openai_configured) {
-        $('orchestrator-status').textContent = 'Aktiv (AI)';
-        $('orchestrator-status').style.background = '#eff6ff';
-        $('orchestrator-status').style.borderColor = '#bfdbfe';
-        $('orchestrator-status').style.color = '#1d4ed8';
-      }
-    }
-  } catch (_) {}
-}
-
 // Autosize textarea
 function autosize(el) {
   el.style.height = 'auto';
@@ -812,7 +883,8 @@ function autosize(el) {
   const newH = Math.max(minH, el.scrollHeight);
   el.style.height = `${newH}px`;
   if (el.id === 'prompt') {
-    $('ghost-overlay').style.height = `${newH}px`;
+    const display = $('canvas-display');
+    if (display) display.style.height = `${newH}px`;
   }
   updateMirrorDimensions();
 }
@@ -824,9 +896,16 @@ function updateMirrorDimensions() {
   const style = window.getComputedStyle(prompt);
   mirror.style.width = `${prompt.clientWidth}px`;
   mirror.style.font = style.font;
+  mirror.style.fontFamily = style.fontFamily;
+  mirror.style.fontSize = style.fontSize;
+  mirror.style.fontWeight = style.fontWeight;
   mirror.style.lineHeight = style.lineHeight;
   mirror.style.letterSpacing = style.letterSpacing;
-  mirror.style.padding = style.padding;
+  mirror.style.paddingTop = style.paddingTop;
+  mirror.style.paddingBottom = style.paddingBottom;
+  mirror.style.paddingLeft = style.paddingLeft;
+  mirror.style.paddingRight = style.paddingRight;
+  mirror.style.boxSizing = style.boxSizing;
 }
 
 function getWordCoordinates(charIndex) {
@@ -851,34 +930,53 @@ function getWordCoordinates(charIndex) {
   };
 }
 
-// Update the inline grey ghost text directly in the canvas (supports middle-of-text positioning)
-function updateGhostOverlay() {
+// Update the inline grey ghost text directly in the canvas (flowing displacement for mid-text rewrites)
+function updateGhostOverlay(hideWhileTyping = false) {
   const prompt = $('prompt');
+  const display = $('canvas-display');
   const text = prompt.value || '';
-  const ghost = state.activeGhostText || '';
+  let ghost = state.activeGhostText || '';
 
-  if (!ghost || !text.trim()) {
-    $('ghost-overlay').innerHTML = '';
+  // Do NOT show ghost text while actively typing, if empty, or while user has text highlighted/selected
+  const hasRangeSelection = document.activeElement === prompt && prompt.selectionStart !== prompt.selectionEnd;
+  if (hideWhileTyping || !ghost || !text.trim() || hasRangeSelection) {
+    display.innerHTML = '';
+    display.classList.remove('visible');
+    prompt.classList.remove('has-ghost');
     return;
   }
 
-  // Anchor at cursor position if in middle of text, else at end of text
-  const cursorIndex = (prompt.selectionStart >= 0 && prompt.selectionStart <= text.length)
-    ? prompt.selectionStart
-    : text.length;
-
-  const insertPos = (state.ghostAnchorIndex >= 0 && state.ghostAnchorIndex <= text.length)
-    ? state.ghostAnchorIndex
-    : cursorIndex;
+  // Insert ghost text at caret if caret is in the middle of text, else append at end of text
+  let insertPos = text.length;
+  if (document.activeElement === prompt && typeof prompt.selectionStart === 'number' && prompt.selectionStart < text.length) {
+    insertPos = prompt.selectionStart;
+  }
 
   const before = text.slice(0, insertPos);
   const after = text.slice(insertPos);
 
-  const prefixSpace = (before.endsWith(' ') || before.endsWith('\n') || ghost.startsWith(' ') || !before) ? '' : ' ';
-  const escapedGhost = escapeHtml(prefixSpace + ghost);
+  // De-duplicate leading word if ghost starts with user's last typed word
+  const lastWordMatch = before.match(/(\S+)\s*$/);
+  if (lastWordMatch) {
+    const lastWord = lastWordMatch[1].toLowerCase();
+    const ghostWords = ghost.trim().split(/\s+/);
+    if (ghostWords.length > 1 && ghostWords[0].toLowerCase() === lastWord) {
+      ghost = ghostWords.slice(1).join(' ');
+    }
+  }
 
-  // Middle-of-text shifting layout
-  $('ghost-overlay').innerHTML = `<span style="visibility: hidden;">${escapeHtml(before)}</span><span class="ghost-text-grey">${escapedGhost}</span><span style="visibility: hidden;">${escapeHtml(after)}</span>`;
+  let prefixSpace = '';
+  if (before && !before.endsWith(' ') && !before.endsWith('\n') && !ghost.startsWith(' ') && !ghost.startsWith('.') && !ghost.startsWith(',')) {
+    prefixSpace = ' ';
+  }
+
+  const escapedBefore = escapeHtml(before);
+  const escapedGhost = escapeHtml(prefixSpace + ghost);
+  const escapedAfter = escapeHtml(after);
+
+  display.innerHTML = `<span>${escapedBefore}</span><span class="ghost-text-grey">${escapedGhost}</span><span>${escapedAfter}</span>`;
+  display.classList.add('visible');
+  prompt.classList.add('has-ghost');
 }
 
 // Dismiss an advice note permanently
@@ -888,90 +986,112 @@ function dismissAdvice(event, agentKey) {
     event.preventDefault();
   }
   state.dismissed[agentKey] = true;
-  const advice = $(`advice-${agentKey}`);
-  if (advice) {
-    advice.hidden = true;
-    advice.style.display = 'none';
+  const badge = $(`info-badge-${agentKey}`);
+  if (badge) {
+    badge.style.display = 'none';
   }
 }
 
-// Keyboard shortcut: Tab accepts the verbatim grey ghost text directly at caret
+// Keyboard shortcut: Tab accepts the verbatim grey ghost text directly at caret / replaces targeted rewrite
 $('prompt').addEventListener('keydown', event => {
-  if (event.key === 'Tab' && state.activeGhostText) {
+  if (event.key === 'Tab' && state.activeGhostText && $('prompt').selectionStart === $('prompt').selectionEnd) {
     event.preventDefault();
     const prompt = $('prompt');
     const text = prompt.value || '';
-    const ghost = state.activeGhostText;
+    let ghost = state.activeGhostText;
 
-    const insertPos = (state.ghostAnchorIndex >= 0 && state.ghostAnchorIndex <= text.length)
-      ? state.ghostAnchorIndex
-      : prompt.selectionStart || text.length;
+    let insertPos = text.length;
+    if (document.activeElement === prompt && typeof prompt.selectionStart === 'number' && prompt.selectionStart < text.length) {
+      insertPos = prompt.selectionStart;
+    }
 
     const before = text.slice(0, insertPos);
     const after = text.slice(insertPos);
-    const prefixSpace = (before.endsWith(' ') || before.endsWith('\n') || ghost.startsWith(' ') || !before) ? '' : ' ';
 
-    // Insert ghost text at exact anchor / caret position
+    // De-duplicate leading word if ghost starts with user's last typed word
+    const lastWordMatch = before.match(/(\S+)\s*$/);
+    if (lastWordMatch) {
+      const lastWord = lastWordMatch[1].toLowerCase();
+      const ghostWords = ghost.trim().split(/\s+/);
+      if (ghostWords.length > 1 && ghostWords[0].toLowerCase() === lastWord) {
+        ghost = ghostWords.slice(1).join(' ');
+      }
+    }
+
+    let prefixSpace = '';
+    if (before && !before.endsWith(' ') && !before.endsWith('\n') && !ghost.startsWith(' ') && !ghost.startsWith('.') && !ghost.startsWith(',')) {
+      prefixSpace = ' ';
+    }
+
     prompt.value = before + prefixSpace + ghost + after;
     const newPos = before.length + prefixSpace.length + ghost.length;
     prompt.setSelectionRange(newPos, newPos);
 
+    state.acceptedGhostTexts.add(ghost.trim().toLowerCase());
     state.activeGhostText = '';
-    state.ghostAnchorIndex = -1;
     updateGhostOverlay();
     updateComposer(true);
   } else if (event.key === 'Escape') {
     state.activeGhostText = '';
-    state.ghostAnchorIndex = -1;
     updateGhostOverlay();
-    // Also dismiss any open floating advice on Escape
     ['director', 'strategist', 'supervisor'].forEach(k => dismissAdvice(null, k));
   }
 });
 
-// Update ghost on cursor position change
-$('prompt').addEventListener('keyup', () => {
-  if (state.activeGhostText) updateGhostOverlay();
+// Update ghost dynamically on cursor position change / selection change
+function onCursorSelectionChange() {
+  renderAgentRecommendations();
+}
+
+document.addEventListener('selectionchange', () => {
+  if (document.activeElement === $('prompt')) {
+    onCursorSelectionChange();
+  }
 });
-$('prompt').addEventListener('click', () => {
-  if (state.activeGhostText) updateGhostOverlay();
+$('prompt').addEventListener('keyup', onCursorSelectionChange);
+$('prompt').addEventListener('click', onCursorSelectionChange);
+$('prompt').addEventListener('focus', onCursorSelectionChange);
+$('prompt').addEventListener('scroll', () => {
+  const display = $('canvas-display');
+  if (display) display.scrollTop = $('prompt').scrollTop;
 });
 
-// Position cursors and update floating advice pills based on live LLM evaluation
+// Position cursors calmly and display (i) info badges only when genuine ideas exist
 function renderAgentRecommendations() {
-  const text = $('prompt').value;
-  const words = text.trim().split(/\s+/).filter(Boolean);
+  const prompt = $('prompt');
+  const text = prompt.value;
+  const trimmed = text.trim();
 
   const cDirector = $('cursor-director');
   const cStrategist = $('cursor-strategist');
   const cSupervisor = $('cursor-supervisor');
 
-  const adviceDirector = $('advice-director');
-  const adviceStrategist = $('advice-strategist');
-  const adviceSupervisor = $('advice-supervisor');
+  const badgeDirector = $('info-badge-director');
+  const badgeStrategist = $('info-badge-strategist');
+  const badgeSupervisor = $('info-badge-supervisor');
 
   const sDirector = $('status-director');
   const sStrategist = $('status-strategist');
   const sSupervisor = $('status-supervisor');
 
-  // Do NOT prematurely invent suggestions if text is too short or vague (< 25 chars or < 5 words)
-  if (!text.trim() || text.trim().length < 25 || words.length < 5) {
-    cDirector.classList.remove('visible');
-    cStrategist.classList.remove('visible');
-    cSupervisor.classList.remove('visible');
-    adviceDirector.style.display = 'none';
-    adviceStrategist.style.display = 'none';
-    adviceSupervisor.style.display = 'none';
+  updateMirrorDimensions();
+
+  // If text is empty or too short, keep all 3 cursors stacked cleanly at start (0,0)
+  if (!trimmed || trimmed.length < 5) {
+    cDirector.style.transform = 'translate(0px, 0px)';
+    cStrategist.style.transform = 'translate(0px, 0px)';
+    cSupervisor.style.transform = 'translate(0px, 0px)';
+    badgeDirector.style.display = 'none';
+    badgeStrategist.style.display = 'none';
+    badgeSupervisor.style.display = 'none';
     state.activeGhostText = '';
-    state.ghostAnchorIndex = -1;
     updateGhostOverlay();
-    if (sDirector) sDirector.textContent = 'bereit';
-    if (sStrategist) sStrategist.textContent = 'bereit';
-    if (sSupervisor) sSupervisor.textContent = 'bereit';
+    const statusText = state.inflight ? 'denkt nach …' : 'bereit';
+    if (sDirector) sDirector.textContent = statusText;
+    if (sStrategist) sStrategist.textContent = statusText;
+    if (sSupervisor) sSupervisor.textContent = statusText;
     return;
   }
-
-  updateMirrorDimensions();
 
   const sentences = text.split(/(?<=[.?!])\s+/).filter(Boolean);
   const recs = state.activeRecommendations || [];
@@ -980,97 +1100,114 @@ function renderAgentRecommendations() {
   const recStrat = recs.find(r => r.agent === 'A3' || (r.role && r.role.toLowerCase().includes('strateg')));
   const recSuper = recs.find(r => r.agent === 'A1' || (r.role && r.role.toLowerCase().includes('supervisor')));
 
-  // Pick best ghost text
+  // Accurate structural sentence boundaries
+  let firstSentenceEnd = text.length;
+  if (sentences.length > 1) {
+    firstSentenceEnd = text.indexOf(sentences[1]);
+  } else if (text.indexOf('.') !== -1) {
+    firstSentenceEnd = text.indexOf('.') + 1;
+  }
+
+  let stratChar = text.length;
+  if (sentences.length > 2) {
+    stratChar = text.indexOf(sentences[2]);
+  }
+
+  // Strictly bind ghost text to the responsible agent's cursor region
   let bestGhost = '';
-  let bestAnchor = -1;
-  if (recDir && recDir.ghost_text && !state.dismissed['director']) {
-    bestGhost = recDir.ghost_text;
-    bestAnchor = text.indexOf('.') !== -1 ? text.indexOf('.') : text.length;
-  } else if (recStrat && recStrat.ghost_text && !state.dismissed['strategist']) {
-    bestGhost = recStrat.ghost_text;
-    bestAnchor = text.length;
-  } else if (recSuper && recSuper.ghost_text && !state.dismissed['supervisor']) {
-    bestGhost = recSuper.ghost_text;
-    bestAnchor = text.length;
+  const caretPos = (document.activeElement === prompt && typeof prompt.selectionStart === 'number') ? prompt.selectionStart : text.length;
+
+  if (caretPos <= firstSentenceEnd) {
+    // Caret is at Hook (Director)
+    if (recDir && recDir.ghost_text && !state.dismissed['director']) {
+      bestGhost = recDir.ghost_text;
+    } else if (sentences.length === 1 && recStrat && recStrat.ghost_text && !state.dismissed['strategist']) {
+      bestGhost = recStrat.ghost_text;
+    }
+  } else if (caretPos <= stratChar || sentences.length <= 2) {
+    // Caret is in Story / KPIs (Strategist)
+    if (recStrat && recStrat.ghost_text && !state.dismissed['strategist']) {
+      bestGhost = recStrat.ghost_text;
+    } else if (recSuper && recSuper.ghost_text && !state.dismissed['supervisor']) {
+      bestGhost = recSuper.ghost_text;
+    }
+  } else {
+    // Caret is at End of text (Supervisor)
+    if (recSuper && recSuper.ghost_text && !state.dismissed['supervisor']) {
+      bestGhost = recSuper.ghost_text;
+    } else if (recStrat && recStrat.ghost_text && !state.dismissed['strategist']) {
+      bestGhost = recStrat.ghost_text;
+    }
+  }
+
+  // De-duplicate against current text and already accepted ghost texts
+  if (bestGhost) {
+    const bgNorm = bestGhost.trim().toLowerCase();
+    if (text.toLowerCase().includes(bgNorm) || state.acceptedGhostTexts.has(bgNorm)) {
+      bestGhost = '';
+    }
   }
   state.activeGhostText = bestGhost;
-  state.ghostAnchorIndex = bestAnchor;
   updateGhostOverlay();
 
-  // 1. Director Cursor & Clean Advice (Anchored to sentence 1 / Hook)
-  const firstSentenceEnd = text.indexOf('.') !== -1 ? text.indexOf('.') : Math.min(35, text.length);
+  // 1. Director Cursor (Anchored at Hook / Sentence 1 only if active or text exists)
   const posDir = getWordCoordinates(firstSentenceEnd);
   cDirector.style.transform = `translate(${posDir.left}px, ${posDir.top}px)`;
-  cDirector.classList.add('visible');
-  if (sDirector) sDirector.textContent = 'Hook analysiert';
 
-  // Automatically hide if issue was solved (recDir not returned) or if dismissed
   if (recDir && !state.dismissed['director'] && (recDir.message || recDir.missing_item)) {
     $('advice-text-director').textContent = recDir.message || recDir.missing_item;
-    adviceDirector.hidden = false;
-    adviceDirector.style.display = 'inline-flex';
+    badgeDirector.style.display = 'inline-flex';
+    if (sDirector) sDirector.textContent = 'Hook analysiert';
   } else {
-    adviceDirector.hidden = true;
-    adviceDirector.style.display = 'none';
+    badgeDirector.style.display = 'none';
+    if (sDirector) sDirector.textContent = state.inflight ? 'denkt nach …' : 'bereit';
   }
 
-  // 2. Strategist Cursor & Clean Advice (Anchored to middle / sentence 2)
-  if (text.length >= 60 && words.length >= 8) {
-    let stratChar = Math.floor(text.length * 0.5);
-    if (sentences.length > 1) {
-      stratChar = text.indexOf(sentences[1]) + Math.min(25, sentences[1].length);
-    }
-    const posStrat = getWordCoordinates(stratChar);
-    cStrategist.style.transform = `translate(${posStrat.left}px, ${posStrat.top}px)`;
-    cStrategist.classList.add('visible');
+  // 2. Strategist Cursor (Anchored at Middle / Traction / KPIs)
+  const posStrat = getWordCoordinates(stratChar);
+  cStrategist.style.transform = `translate(${posStrat.left}px, ${posStrat.top}px)`;
+
+  if (recStrat && !state.dismissed['strategist'] && (recStrat.message || recStrat.missing_item)) {
+    $('advice-text-strategist').textContent = recStrat.message || recStrat.missing_item;
+    badgeStrategist.style.display = 'inline-flex';
     if (sStrategist) sStrategist.textContent = 'KPIs analysiert';
-
-    // Automatically hide if issue was solved or dismissed
-    if (recStrat && !state.dismissed['strategist'] && (recStrat.message || recStrat.missing_item)) {
-      $('advice-text-strategist').textContent = recStrat.message || recStrat.missing_item;
-      adviceStrategist.hidden = false;
-      adviceStrategist.style.display = 'inline-flex';
-    } else {
-      adviceStrategist.hidden = true;
-      adviceStrategist.style.display = 'none';
-    }
   } else {
-    cStrategist.classList.remove('visible');
-    adviceStrategist.style.display = 'none';
-    if (sStrategist) sStrategist.textContent = 'bereit';
+    badgeStrategist.style.display = 'none';
+    if (sStrategist) sStrategist.textContent = state.inflight ? 'denkt nach …' : 'bereit';
   }
 
-  // 3. Supervisor Cursor & Clean Advice (Anchored to end / CTA)
-  if (text.length >= 100 && words.length >= 15) {
-    const posSuper = getWordCoordinates(text.length);
-    cSupervisor.style.transform = `translate(${posSuper.left}px, ${posSuper.top}px)`;
-    cSupervisor.classList.add('visible');
-    if (sSupervisor) sSupervisor.textContent = 'Länge & CTA analysiert';
+  // 3. Supervisor Cursor (Anchored at End of Text / CTA)
+  const posSuper = getWordCoordinates(text.length);
+  cSupervisor.style.transform = `translate(${posSuper.left}px, ${posSuper.top}px)`;
 
-    // Automatically hide if issue was solved or dismissed
-    if (recSuper && !state.dismissed['supervisor'] && (recSuper.message || recSuper.missing_item)) {
-      $('advice-text-supervisor').textContent = recSuper.message || recSuper.missing_item;
-      adviceSupervisor.hidden = false;
-      adviceSupervisor.style.display = 'inline-flex';
-    } else {
-      adviceSupervisor.hidden = true;
-      adviceSupervisor.style.display = 'none';
-    }
+  if (recSuper && !state.dismissed['supervisor'] && (recSuper.message || recSuper.missing_item)) {
+    $('advice-text-supervisor').textContent = recSuper.message || recSuper.missing_item;
+    badgeSupervisor.style.display = 'inline-flex';
+    if (sSupervisor) sSupervisor.textContent = 'Länge & CTA analysiert';
   } else {
-    cSupervisor.classList.remove('visible');
-    adviceSupervisor.style.display = 'none';
-    if (sSupervisor) sSupervisor.textContent = 'bereit';
+    badgeSupervisor.style.display = 'none';
+    if (sSupervisor) sSupervisor.textContent = state.inflight ? 'denkt nach …' : 'bereit';
   }
 }
 
 function updateComposer(immediate = false) {
   autosize($('prompt'));
-  updateGhostOverlay();
   const text = $('prompt').value.trim();
   $('generate').disabled = text.length < 10 || state.generating;
   $('create-video').hidden = $('script-result').hidden || state.uploading;
 
-  // React on typing pause
+  // While actively typing: hide badges and ghost text to prevent flickering / distracting jumps
+  if (!immediate) {
+    updateGhostOverlay(true);
+    const badgeDir = $('info-badge-director');
+    const badgeStrat = $('info-badge-strategist');
+    const badgeSuper = $('info-badge-supervisor');
+    if (badgeDir) badgeDir.style.display = 'none';
+    if (badgeStrat) badgeStrat.style.display = 'none';
+    if (badgeSuper) badgeSuper.style.display = 'none';
+  }
+
+  // Deliberate pause before computing suggestions so text doesn't constantly change
   clearTimeout(state.typingTimeout);
   if (immediate) {
     renderAgentRecommendations();
@@ -1078,15 +1215,17 @@ function updateComposer(immediate = false) {
     state.typingTimeout = setTimeout(renderAgentRecommendations, 300);
   }
 
-  // Trigger live genuine backend orchestration on typing pause
+  // 550ms deliberate debounce before asking LLM for new pitch ideas
   clearTimeout(state.orchestrateDebounce);
-  state.orchestrateDebounce = setTimeout(triggerAgenticOrchestration, 500);
+  state.orchestrateDebounce = setTimeout(triggerAgenticOrchestration, 550);
 }
 
 async function triggerAgenticOrchestration() {
   const prompt = $('prompt').value.trim();
-  const words = prompt.split(/\s+/).filter(Boolean);
-  if (prompt.length < 25 || words.length < 5) return;
+  if (prompt.length < 12) return;
+  state.inflight = true;
+  renderAgentRecommendations();
+
   try {
     const res = await fetch('/api/devin/orchestrate', {
       method: 'POST',
@@ -1096,9 +1235,11 @@ async function triggerAgenticOrchestration() {
     if (res.ok) {
       const data = await res.json();
       state.activeRecommendations = data.recommendations || [];
-      renderAgentRecommendations();
     }
-  } catch (_) {}
+  } catch (_) {} finally {
+    state.inflight = false;
+    renderAgentRecommendations();
+  }
 }
 
 function renderAttachments() {
@@ -1283,9 +1424,6 @@ function startDictation() {
 }
 
 $('prompt').addEventListener('input', () => updateComposer(false));
-$('prompt').addEventListener('scroll', () => {
-  $('ghost-overlay').scrollTop = $('prompt').scrollTop;
-});
 $('script-output').addEventListener('input', () => autosize($('script-output')));
 $('upload').addEventListener('click', () => $('picker').click());
 $('picker').addEventListener('change', event => {
@@ -1315,7 +1453,6 @@ if (MOCK) {
   });
 }
 
-checkInitialConfig();
 updateComposer(true);
 </script>
 </body>

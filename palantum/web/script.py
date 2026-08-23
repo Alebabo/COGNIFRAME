@@ -37,43 +37,43 @@ BEAT_DEFAULTS = {
         "title": "Hook",
         "time": "3–6s",
         "description": "Erste 1.5s mit einer konkreten, packenden Aussage. Keine Begrüßung.",
-        "placeholder": "Zwei Stunden Fehlersuche werden mit Palantum zu zwei Minuten...",
+        "placeholder": "Formuliere deine These oder deinen packenden Einstieg...",
     },
     "PROBLEM": {
         "title": "Problem",
         "time": "6–10s",
         "description": "Wer leidet unter dem Schmerz und was kostet es wirklich?",
-        "placeholder": "Entwickler verlieren täglich wertvolle Zeit durch fehlerhafte Tests...",
+        "placeholder": "Beschreibe die konkrete Herausforderung der Zielgruppe...",
     },
     "SOLUTION": {
         "title": "Lösung",
         "time": "8–14s",
         "description": "Der konkrete Mechanismus – wie funktioniert die Lösung genau?",
-        "placeholder": "Unsere Engine analysiert Testläufe und isoliert die genaue Ursache...",
+        "placeholder": "Erkläre den einzigartigen Mechanismus deiner Lösung...",
     },
     "DEMO": {
         "title": "Demo & Visuals",
         "time": "8–15s",
         "description": "Sichtbares Produktmaterial oder UI-Walkthrough.",
-        "placeholder": "Ein Klick öffnet direkt den passenden Fix im Code...",
+        "placeholder": "Zeige oder beschreibe das Produkt im echten Einsatz...",
     },
     "TRACTION": {
         "title": "Traction & Zahlen",
         "time": "4–8s",
         "description": "Mindestens eine konkrete Zahl mit klarem Zeitbezug.",
-        "placeholder": "In den letzten 3 Monaten haben 120 Teams unsere Beta genutzt...",
+        "placeholder": "Nenne messbare Nutzerzahlen, Umsatz oder Wachstum...",
     },
     "TEAM": {
         "title": "Team",
         "time": "3–6s",
         "description": "Namen und der entscheidende 'Unfair Advantage'.",
-        "placeholder": "Wir haben zuvor 6 Jahre die Testinfrastruktur bei Google skaliert...",
+        "placeholder": "Beschreibe den besonderen Hintergrund und die Kernkompetenz...",
     },
     "ASK": {
         "title": "Call to Action",
         "time": "3–5s",
         "description": "Klarer Handlungsaufruf mit konkretem Ziel.",
-        "placeholder": "Starte jetzt die kostenlose Developer Preview auf palantum.dev.",
+        "placeholder": "Formuliere den klaren Aufruf an die Zielgruppe...",
     },
 }
 
@@ -136,26 +136,30 @@ def evaluate_canvas_agentic(
     now = time.time()
     if cache_key in _AGENTIC_CACHE:
         timestamp, cached_result = _AGENTIC_CACHE[cache_key]
-        if now - timestamp < 300:  # 5 min cache
+        if cached_result and (now - timestamp < 300):  # 5 min cache
             return cached_result
 
     _ensure_env()
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        beats = parse_canvas_beats(trimmed)
-        return evaluate_canvas(beats, attached_videos)
+        return []
 
     prompt = (
-        "Du bist das kollaborative Agenten-Trio von Palantum für 60s YC-Startup-Video-Pitches:\n"
-        "- A2 (Director): Regie, Hook (1–3s), Schnitte, keine Begrüßungsfloskeln.\n"
-        "- A3 (Strategist): Pitch-Story, harte KPIs/Zahlen, messbarer Nutzen, Zielgruppe.\n"
-        "- A1 (Supervisor): Skript-Länge (~130 Wörter), Wortgrenzen, klarer CTA.\n\n"
-        f"Hier ist der aktuelle Rohentwurf des Nutzers:\n\"\"\"\n{trimmed}\n\"\"\"\n\n"
-        "Aufgabe: Analysiere den Text. WICHTIGE REGEL: Wenn ein Aspekt (z.B. Hook ohne Begrüßung, "
-        "vorhandene KPIs/Zahlen oder CTA) bereits GUT formuliert ist, erzeuge für diesen Agenten "
-        "KEINE Recommendation! Gib nur dann Einträge in 'recommendations' zurück, wenn wirklich "
-        "ein konkretes Problem vorliegt. Wenn alles gelöst ist, gib ein leeres Array [] aus.\n\n"
-        "Antworte ausschließlich als valides JSON-Objekt mit folgender Struktur:\n"
+        "Du bist das kollaborative Agenten-Trio von Palantum für 60s Startup-Video-Pitches:\n"
+        "- A2 (Director): Regie, Hook (Satz 1), sofortige Bildsprache, Nutzenstart.\n"
+        "- A3 (Strategist): Problem & Traction (Satz 2/Mitte), Schmerzpunkte, Zahlen/KPIs.\n"
+        "- A1 (Supervisor): Abschluss & Call to Action (Satz 3/Ende), prägnanter CTA.\n\n"
+        f"Hier ist der aktuelle Entwurf des Nutzers:\n\"\"\"\n{trimmed}\n\"\"\"\n\n"
+        "Aufgabe:\n"
+        "1. Analysiere den Entwurf. Nicht jeder Agent muss Feedback liefern!\n"
+        "2. Wenn ein Agent eine echte Verbesserung hat, erzeuge eine Recommendation.\n"
+        "3. STRIKTE REGELN FÜR 'ghost_text':\n"
+        "   - 'ghost_text' ist OPTIONAL (leer lassen \"\", wenn kein Textvorschlag nötig ist).\n"
+        "   - KEINE WIEDERHOLUNG: ghost_text darf keine Wörter wiederholen, die im Text stehen.\n"
+        "   - GRAMMATIK: Wenn der Satz unvollendet ist (kein Punkt am Ende), MUSS ghost_text mit "
+        "einem Kleinbuchstaben beginnen und den Satz grammatikalisch exakt fortführen.\n"
+        "   - Wenn der Satz beendet ist (. ! ?), beginnt ghost_text als neuer Satz.\n\n"
+        "Antworte ausschließlich als valides JSON-Objekt:\n"
         "{\n"
         '  "recommendations": [\n'
         "    {\n"
@@ -163,9 +167,9 @@ def evaluate_canvas_agentic(
         '      "agent": "A2",\n'
         '      "role": "Director",\n'
         '      "beat": "HOOK",\n'
-        '      "missing_item": "Konkreter Hook / Visuelle Eröffnung",\n'
-        '      "message": "Knapper Ratschlag...",\n'
-        '      "ghost_text": "Thematisch passender Satz...",\n'
+        '      "missing_item": "Direkter Einstieg",\n'
+        '      "message": "Kurzer Ratschlag...",\n'
+        '      "ghost_text": "Grammatisch passender Anschlusstext oder leer",\n'
         '      "anchor": "hook",\n'
         '      "anchor_line": 0\n'
         "    }\n"
@@ -192,10 +196,26 @@ def evaluate_canvas_agentic(
         )
         content = response.choices[0].message.content or "{}"
         parsed = json.loads(content)
-        recs = parsed.get("recommendations", [])
-        if isinstance(recs, list) and recs:
-            _AGENTIC_CACHE[cache_key] = (now, recs)
-            return recs
+        raw_recs = parsed.get("recommendations", [])
+        if isinstance(raw_recs, list) and raw_recs:
+            cleaned_recs: list[dict[str, Any]] = []
+            normalized_text = trimmed.lower()
+            for rec in raw_recs:
+                if not isinstance(rec, dict):
+                    continue
+                ghost = (rec.get("ghost_text") or "").strip()
+                if ghost:
+                    ghost_lower = ghost.lower()
+                    # Filter out duplicate suggestions already typed
+                    if ghost_lower in normalized_text:
+                        rec["ghost_text"] = ""
+                    words_ghost = ghost_lower.split()
+                    if len(words_ghost) >= 4 and " ".join(words_ghost[:4]) in normalized_text:
+                        rec["ghost_text"] = ""
+                cleaned_recs.append(rec)
+
+            _AGENTIC_CACHE[cache_key] = (now, cleaned_recs)
+            return cleaned_recs
     except Exception:
         pass
 
@@ -211,10 +231,13 @@ def evaluate_canvas(
     """Analyze canvas beats and generate actionable recommendations from A2 and A3."""
     recs: list[dict[str, Any]] = []
     attached = attached_videos or {}
+    filled_count = len([v for v in beats.values() if v.strip()])
+    is_completely_empty = filled_count == 0
+    is_full_pitch = len(beats) >= 6 and filled_count >= 3
 
     # 1. Check HOOK
     hook = beats.get("HOOK", "").strip()
-    if not hook:
+    if not hook and is_completely_empty:
         recs.append({
             "id": "rec-hook-missing",
             "agent": "A2",
@@ -252,7 +275,7 @@ def evaluate_canvas(
 
     # 2. Check PROBLEM
     problem = beats.get("PROBLEM", "").strip()
-    if not problem:
+    if not problem and is_completely_empty:
         recs.append({
             "id": "rec-problem-missing",
             "agent": "A2",
@@ -266,7 +289,7 @@ def evaluate_canvas(
             "anchor": "problem",
             "anchor_line": 1,
         })
-    elif len(problem.split()) < 4:
+    elif problem and (len(problem.split()) <= 4 or not re.search(r"\d+", problem)):
         recs.append({
             "id": "rec-problem-short",
             "agent": "A3",
@@ -283,7 +306,7 @@ def evaluate_canvas(
 
     # 3. Check SOLUTION
     solution = beats.get("SOLUTION", "").strip()
-    if not solution:
+    if not solution and is_completely_empty:
         recs.append({
             "id": "rec-sol-missing",
             "agent": "A2",
@@ -300,7 +323,7 @@ def evaluate_canvas(
 
     # 4. Check DEMO
     has_demo_video = bool(attached.get("DEMO"))
-    if not has_demo_video:
+    if not has_demo_video and (is_completely_empty or is_full_pitch):
         recs.append({
             "id": "rec-demo-video",
             "agent": "A2",
@@ -317,7 +340,7 @@ def evaluate_canvas(
 
     # 5. Check TRACTION
     traction = beats.get("TRACTION", "").strip()
-    if not traction or not re.search(r"\d+", traction):
+    if (not traction and is_completely_empty) or (traction and not re.search(r"\d+", traction)):
         recs.append({
             "id": "rec-trac-numbers",
             "agent": "A3",
@@ -334,7 +357,7 @@ def evaluate_canvas(
 
     # 6. Check ASK
     ask = beats.get("ASK", "").strip()
-    if not ask:
+    if not ask and (is_completely_empty or is_full_pitch):
         recs.append({
             "id": "rec-ask-missing",
             "agent": "A1",
@@ -357,17 +380,17 @@ def _fallback_script(description: str) -> str:
     return (
         f"01 HOOK\n{subject}\n\n"
         "02 PROBLEM\n"
-        "Entwickler und Teams verlieren täglich wertvolle Zeit.\n\n"
+        f"[Konkretes Problem und Betroffene bezogen auf: {subject}]\n\n"
         "03 SOLUTION\n"
-        "Unsere Software automatisiert den gesamten Ablauf mit intelligenten Mechanismen.\n\n"
+        f"[Lösungsmechanismus und Kernfunktion für: {subject}]\n\n"
         "04 DEMO / BEWEIS\n"
-        "[Füge hier einen belegbaren Demo-Moment, ein Ergebnis oder Kundenfeedback ein.]\n\n"
+        "[Visueller Beweis, Produkt-Demo oder messbares Ergebnis]\n\n"
         "05 TRACTION\n"
-        "In den letzten 3 Monaten haben bereits über 100 Teams die Lösung im Einsatz.\n\n"
+        "[Messbare Nutzerzahlen oder Wachstums-KPIs mit Zeitbezug]\n\n"
         "06 TEAM\n"
-        "Wir verfügen über langjährige Erfahrung im Aufbau skalierbarer Plattformen.\n\n"
+        "[Erfahrung, Unfair Advantage und Vision]\n\n"
         "07 ASK / CTA\n"
-        "[Sage klar, was die Zuschauerinnen und Zuschauer als Nächstes tun sollen.]"
+        "[Klarer Handlungsaufruf mit direktem Ziel]"
     )
 
 
@@ -378,7 +401,8 @@ def _word_chunks(text: str) -> Iterator[str]:
 
 
 def create_script_stream(description: str) -> tuple[Iterator[str], str]:
-    """Return a genuine model stream when configured, otherwise an honest local scaffold."""
+    """Return a genuine model stream when configured, otherwise an honest contextual scaffold."""
+    _ensure_env()
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return _word_chunks(_fallback_script(description)), "local"
@@ -413,6 +437,7 @@ def create_agent_assist_stream(
     agent_id: str, beat_id: str | None, current_text: str, brief: str
 ) -> tuple[Iterator[str], str]:
     """Generate live interactive assistance or autocomplete from an Entire/Palantum agent."""
+    _ensure_env()
     api_key = os.getenv("OPENAI_API_KEY")
     agent_roles = {
         "A2": "Du bist A2 (Director). Gib präzise Regieanweisungen für den Schnitt.",
@@ -438,12 +463,12 @@ def create_agent_assist_stream(
                 current_text,
                 flags=re.IGNORECASE,
             ).strip()
-            capitalized = clean.capitalize() or "Zwei Stunden werden zu zwei Minuten."
+            capitalized = clean.capitalize() if clean else "Direkter Einstieg ohne Begrüßung."
             dynamic = f"Starte direkt: '{capitalized}'"
         elif beat_id == "TRACTION" or not re.search(r"\d+", current_text):
-            dynamic = "Ergänze konkrete Kennzahlen: 'Über 100 Teams nutzen die Lösung produktiv.'"
+            dynamic = "Ergänze konkrete Kennzahlen und Wachstumszahlen mit Zeitbezug."
         elif beat_id == "ASK":
-            dynamic = "Schließe mit klarem Call-to-Action: 'Teste die Beta jetzt kostenlos.'"
+            dynamic = "Schließe mit einem klaren Call-to-Action für deine Zielgruppe ab."
         else:
             dynamic = "Präzisiere den konkreten Mehrwert und nenne die Zielgruppe direkt."
         return _word_chunks(dynamic), "local"

@@ -452,6 +452,7 @@ def create_app(
 
     @app.post("/api/devin/orchestrate")
     def api_devin_orchestrate(request: DevinOrchestrateRequest) -> dict[str, Any]:
+        _load_env()
         edit_dir = root / "edit"
         current = _load_canvas(edit_dir)
         text = request.text or request.prompt or current.get("text", "")
