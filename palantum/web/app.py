@@ -426,10 +426,6 @@ def state_payload(videos_dir: Path) -> dict[str, Any]:
     state = load(edit_dir, _schema())
     job = _job(edit_dir)
     canvas = _load_canvas(edit_dir)
-    sources = state.get("meta", {}).get("sources", [])
-    has_sources = bool(sources) or any(
-        next(videos_dir.glob(pattern), None) is not None for pattern in ("*.mp4", "*.mov")
-    )
     final = edit_dir / "final.mp4"
     job_status = str(job.get("status", ""))
     with _MANIFEST_LOCK:
@@ -448,10 +444,10 @@ def state_payload(videos_dir: Path) -> dict[str, Any]:
         phase = "review"
     elif final.exists():
         phase = "done"
-    elif not has_sources:
-        phase = "empty"
     else:
-        phase = "working"
+        # Source files and cached coverage do not mean that a video job is active.
+        # Only an explicit job status may put the UI into its progress state.
+        phase = "empty"
     open_notes = [
         _note_payload(note)
         for note in state.get("director_notes", [])

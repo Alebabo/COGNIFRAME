@@ -1204,7 +1204,7 @@
 </main>
 
 <div id="mirror"></div>
-<img class="corner-logo" src="palantum-logo.png" alt="Palantum">
+<img class="corner-logo" src="palantum-logo.png" alt="PitchCraft">
 
 <!-- Minimal Reverted Bottom Toolbar -->
 <footer id="toolbar" class="toolbar">
@@ -1358,25 +1358,12 @@ function renderAgentActivity(sessions = []) {
 
 function beginCanvasAgentActivity(requestId, copy) {
   state.activeCanvasAgents.set(requestId, copy);
-  const statusCard = $('job-status-card');
-  if (statusCard.hidden || ['error', 'success'].includes(statusCard.dataset.tone)) {
-    showJobStatus({
-      tone: 'active',
-      title: 'Agent analysiert deinen Text',
-      detail: 'Der aktuelle Inhalt wird geprüft. Du kannst währenddessen weiterschreiben.',
-      eta: 'wenige Sekunden',
-      progress: 35,
-    });
-  }
   renderAgentActivity();
 }
 
 function endCanvasAgentActivity(requestId) {
   state.activeCanvasAgents.delete(requestId);
   renderAgentActivity();
-  if (!state.activeCanvasAgents.size && !state.uploading && !state.pollingRecommendations && !state.finalizing) {
-    hideJobStatus();
-  }
 }
 
 function showContextHint({ kind = 'context', kicker, title, detail }) {
@@ -1464,17 +1451,13 @@ function renderJobStatus(data) {
   }
 
   if (phase === 'working') {
-    const status = ['queued', 'running', 'finalizing'].includes(reportedStatus)
-      ? reportedStatus
-      : (data.selection_complete ? 'finalizing' : 'running');
+    if (!['running', 'finalizing'].includes(reportedStatus)) {
+      hideJobStatus();
+      setProgressValue(0);
+      return;
+    }
+    const status = reportedStatus;
     const presentation = {
-      queued: {
-        tone: 'waiting',
-        title: 'Videoauftrag angenommen',
-        detail: 'Der Upload ist abgeschlossen und wartet auf die Verarbeitung.',
-        eta: 'ca. 6–10 Min.',
-        progress: 12,
-      },
       running: {
         tone: 'active',
         title: 'Video wird erstellt',
@@ -2274,19 +2257,7 @@ async function uploadVideos(files, brief) {
   clearTimeout(state.canvasSaveTimeout);
   if (state.canvasHydrated) await saveCanvas(++state.saveRevision);
   state.uploading = true;
-  $('script-result').hidden = true;
-  $('progress').hidden = false;
-  $('progress-copy').textContent = 'Video wird hochgeladen …';
-  $('output').hidden = true;
-  $('toolbar').hidden = true;
-  showJobStatus({
-    tone: 'waiting',
-    title: 'Videoauftrag gestartet',
-    detail: 'Das Video wird hochgeladen und für die Verarbeitung vorbereitet.',
-    eta: 'ca. 6–10 Min.',
-    progress: 8,
-  });
-  startJobActivityPolling();
+  updateComposer(true);
 
   const form = new FormData();
   videos.forEach(f => form.append('files', f));
@@ -2298,12 +2269,14 @@ async function uploadVideos(files, brief) {
       const payload = await response.json().catch(() => ({}));
       throw new Error(payload.detail || payload.error || 'Der Upload ist fehlgeschlagen.');
     }
+    startJobActivityPolling();
     poll();
   } catch (error) {
     state.uploading = false;
     stopJobActivityPolling();
     $('progress').hidden = true;
     $('toolbar').hidden = false;
+    updateComposer(true);
     showJobStatus({
       tone: 'error',
       title: 'Upload fehlgeschlagen',
@@ -2492,14 +2465,6 @@ async function finalizeVideo() {
   if ($('finalize').disabled) return;
   state.finalizing = true;
   renderChunkReview(state.chunks, true);
-  showJobStatus({
-    tone: 'waiting',
-    title: 'Finaler Render gestartet',
-    detail: 'Die Auswahl wird für den finalen Videoschnitt vorbereitet.',
-    eta: 'ca. 1–3 Min.',
-    progress: 82,
-  });
-  startJobActivityPolling();
   try {
     const response = await fetch('/api/finalize', { method: 'POST' });
     if (!response.ok) {
@@ -2507,9 +2472,7 @@ async function finalizeVideo() {
       throw new Error(payload.detail || 'Das finale Video konnte nicht gestartet werden.');
     }
     state.uploading = true;
-    $('chunk-review').hidden = true;
-    $('progress').hidden = false;
-    $('progress-copy').textContent = 'Deine Auswahl wird zusammengesetzt …';
+    startJobActivityPolling();
     poll();
   } catch (error) {
     state.finalizing = false;
@@ -2577,10 +2540,13 @@ function applyServerState(data) {
     state.uploading = true;
     state.pollingRecommendations = false;
     startJobActivityPolling();
-    $('progress').hidden = false;
-    $('chunk-review').hidden = true;
+    const jobStarted = ['running', 'finalizing'].includes(String(data.job_status || '').toLowerCase());
+    $('progress').hidden = !jobStarted;
+    $('chunk-review').hidden = jobStarted || !data.selection_complete;
     $('output').hidden = true;
     $('toolbar').hidden = false;
+    if (!jobStarted) return false;
+    $('script-result').hidden = true;
     const score = Math.round((data.coverage?.score || 0) * 100);
     $('progress-copy').textContent = data.selection_complete
       ? 'Deine Auswahl wird zusammengesetzt …'

@@ -105,6 +105,15 @@ def test_state_payload_exposes_precise_video_job_status(tmp_path: Path) -> None:
     assert result["job_status"] == "finalizing"
 
 
+def test_source_without_active_job_does_not_show_video_progress(tmp_path: Path) -> None:
+    (tmp_path / "demoeins.mp4").write_bytes(b"source")
+
+    result = state_payload(tmp_path)
+
+    assert result["phase"] == "empty"
+    assert result["job_status"] == "idle"
+
+
 def test_upload_passes_motion_pack_to_background_job(tmp_path: Path) -> None:
     template = tmp_path / "templates.zip"
     template.write_bytes(b"zip")
@@ -465,6 +474,23 @@ def test_frontend_exposes_canvas_agent_status_and_actions(tmp_path: Path) -> Non
     assert "state.seenRequestIds.has(responseId)" in response.text
     assert "data.recommendations_status === 'pending'" in response.text
     assert "state.uploading || state.pollingRecommendations" in response.text
+
+
+def test_frontend_defers_job_ui_until_video_processing_is_running(tmp_path: Path) -> None:
+    html = TestClient(create_app(tmp_path)).get("/").text
+
+    canvas_activity = html.split("function beginCanvasAgentActivity", 1)[1].split(
+        "function endCanvasAgentActivity", 1
+    )[0]
+    upload_start = html.split("async function uploadVideos", 1)[1].split(
+        "const form = new FormData();", 1
+    )[0]
+
+    assert "showJobStatus" not in canvas_activity
+    assert "$('progress').hidden = false" not in upload_start
+    assert "title: 'Videoauftrag gestartet'" not in upload_start
+    assert "if (!['running', 'finalizing'].includes(reportedStatus))" in html
+    assert "const jobStarted = ['running', 'finalizing'].includes" in html
 
 
 def test_state_payload_exposes_two_variants_per_chunk_for_review(tmp_path: Path) -> None:

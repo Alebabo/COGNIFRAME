@@ -1,8 +1,9 @@
-# Palantum — P0 architecture
+# COGNIFRAME / Palantum — implemented architecture
 
-Palantum is a director layer on top of [`browser-use/video-use`](https://github.com/browser-use/video-use).
-video-use does the cutting; Palantum decides what the video should be, what is missing from the
-footage, and hands the project back to the user in separable tracks.
+COGNIFRAME is an autonomous pitch-video production layer on top of the Devin API. `palantum` is
+the package name. Devin sessions make semantic editorial decisions; a deterministic Python state
+machine validates and coordinates them; pinned `browser-use/video-use`, FFmpeg, and Remotion
+execute the accepted plan and return separable tracks.
 
 ## Layout
 
@@ -17,7 +18,7 @@ palantum/
   agents/
     runner.py          # Devin-only role invocation + schema validation
     backends/          # devin.py (Devin API sessions)
-    prompts/*.md       # role prompts (A0-A7, including A5 variant review)
+    prompts/*.md       # nine role contracts: A0-A7 plus A6W
   motion/              # external-pack catalog + isolated Remotion slot harnesses
   engine/
     videouse.py        # wrapper around vendored video-use helpers
@@ -76,6 +77,38 @@ It creates one session per role (and one per A6.x motion slot) with
 `structured_output_schema`, `tags` (`run-<n>`, role), and `max_acu_limit`. Session URLs are written
 atomically to `sessions.json` and surfaced in the UI. OpenAI is reserved for Whisper
 transcription; it is not an agent backend.
+
+## Autonomous decision boundary
+
+The word *autonomous* refers to bounded state transitions, not an unrestricted loop:
+
+1. a Devin role proposes structured state;
+2. JSON Schema validates its shape;
+3. deterministic domain checks decide whether it may advance;
+4. A4 alone may receive one semantic correction message in the same session;
+5. the revised output either passes or stops the workflow.
+
+Schema-invalid output may be retried once in a fresh session with the schema error in context.
+Timeout retry is also capped at one and terminates the timed-out session. `sessions.json` records
+live URLs and, for the A4 correction path, `reasoning_steps` and `validation_findings`.
+
+A4 context is planned below 28,000 serialized characters; the Devin transport rejects any prompt
+at or above 30,000 characters before network access. Stored transcripts retain their original
+precision—only agent-context timestamps are rounded and candidate-windowed.
+
+This boundary is deliberate: Devin owns semantic judgment, while local code owns file identity,
+interval validity, resource limits, measurements, and permission to render.
+
+## Motion and visual QC boundary
+
+Version B requires exactly one motion overlay. Curated full-bleed scenes render as upper-right
+insets; unknown scenes are alpha-sampled at 25%, 50%, and 75% and get one inset re-render when
+coverage exceeds 35%. Persistently opaque results fail. Numeric hero scenes require a parseable
+number and 4.5:1 contrast. Structured scenes receive at least 4.5 seconds when the beat permits.
+
+Subtitle cues are removed or split across motion windows. Local `visual_qc` measurements are
+authoritative and can veto A7. Without image evidence, A7 must mark image-dependent checks
+`unmeasurable`, never `pass`.
 
 ## Web API contract
 
