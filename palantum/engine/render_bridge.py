@@ -20,7 +20,9 @@ _HIDE_SUBTITLES = (
     "build_master_srt(edl, edit_dir, subs_path)\n"
     "            from palantum.engine.render_bridge import "
     "hide_subtitles_during_overlays\n"
-    "            hide_subtitles_during_overlays(subs_path, edl.get('overlays') or [])"
+    "            hide_subtitles_during_overlays(subs_path, edl.get('overlays') or [])\n"
+    "            if not subs_path.read_text(encoding='utf-8').strip():\n"
+    "                subs_path = None"
 )
 _SUBTITLE_STYLE = (
     '"FontName=Helvetica,FontSize=18,Bold=1,"\n'
