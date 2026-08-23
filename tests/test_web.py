@@ -497,6 +497,16 @@ def test_frontend_keeps_pitchcraft_logo_top_left_and_ui_copy_in_english(
     assert ">Generate</button>" in html
     assert ">Create video</button>" in html
     assert "AI recommendation unavailable" in html
+    for stale_copy in (
+        "Verbesserungsvorschlag",
+        "Generieren",
+        "Video erstellen",
+        "nicht verfügbar",
+        "Auswählen",
+        "Material wird analysiert",
+        "KI-Empfehlung",
+    ):
+        assert stale_copy not in html
 
 
 def test_frontend_defers_job_ui_until_video_processing_is_running(tmp_path: Path) -> None:
