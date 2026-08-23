@@ -1,0 +1,68 @@
+1. Echter Code-Bug, gefixt in PR [#2](https://github.com/Alebabo/COGNIFRAME/pull/2): A4 wurde von Devin mit `400 Prompt is too long` abgelehnt — der Chunk-Plan-Prompt hatte mit den echten Transkripten 37.300 statt max. 30.000 Zeichen, praktisch nur wegen Float-Rauschen in den Whisper-Timestamps. Jetzt werden die Timestamps nur für den Prompt auf Millisekunden gerundet (29.293 Zeichen); Restpuffer ist aber knapp, längeres Material fällt wieder rein.
+2. Echter Produktbug, dokumentiert statt gefixt (deine Entscheidung): Variante B verdeckt die Aufnahme. Das Motion-Overlay `hero-stat-callout` ist Full-Bleed und opak, dazu dunkelgrauer Text auf `#0B0B0B` und `heroValue "?"` rendert als „0“. A7 sagt trotzdem „pass“, weil die QC-Rolle keine Frames sieht — d.h. die visuelle QC ist derzeit blind.
+3. Kein Code-Bug, aber ein Setup-Fallstrick, der uns lange blockiert hat: `uv run` lädt die `.env` und überschreibt injizierte Env-Variablen, deshalb lief der Server immer mit dem alten Key ohne Guthaben (429). Nur mit `uv run --no-env-file` greift ein von außen gesetzte
+
+---
+
+fix
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# A4-Budget, sichere Motion-Overlays und stabiler Env-Start
+
+## Zusammenfassung
+
+Die Timestamp-Rundung aus [PR #2](https://github.com/Alebabo/COGNIFRAME/pull/2) wird übernommen und zu einem echten Prompt-Budget ausgebaut. Variante B behält genau eine Motion Graphic, rendert opake Full-Bleed-Szenen jedoch als Teilbild. Ein offizieller Launcher schützt injizierte Zugangsdaten mit `uv run --no-env-file`.
+
+## Implementierung
+
+- **A4-Prompt**
+  - Timestamps ausschließlich im Agentenkontext auf Millisekunden runden; gespeicherte Transkripte bleiben unverändert.
+  - Globalen A4-Plan beibehalten, den Kontext aber auf A4-relevante Director-Felder, Slips und Kandidaten reduzieren.
+  - Wortindex und Phrasentranskript nur für Kandidatenfenster inklusive ±0,5 Sekunden Rand übertragen.
+  - Pro Beat die Director-Auswahl und höchstens drei eindeutige Alternativen behalten; bei Budgetüberschreitung Alternativen deterministisch von hinten entfernen, niemals die Director-Auswahl.
+  - Varianten-Cutter erhalten nur den aktuellen Beat und dessen Kandidaten.
+  - Serialisierten Devin-Prompt auf höchstens 28.000 Zeichen planen und im Transport strikt gegen das API-Limit `<30.000` prüfen. Passt selbst die minimale Auswahl nicht, vor dem Netzwerkaufruf mit Rolle, Länge und betroffenem Beat verständlich abbrechen.
+
+- **Motion und visuelle QC**
+  - Katalogschema erhöhen und bekannte Full-Bleed-Szenen wie `hero-stat-callout` als `presentation: inset` markieren.
+  - Inset als transparente Vollformat-Komposition mit einer Karte oben rechts rendern: 52 % Bildbreite, höchstens 48 % Bildhöhe, 4 % Rand, abgerundete Ecken und Schatten.
+  - Unbekannte Szenen nach dem Rendern an 25 %, 50 % und 75 % ihrer Laufzeit per FFmpeg-Alpha-Messung prüfen. Überschreitet die maximale mittlere Alpha-Abdeckung 35 %, einmal als Inset neu rendern; ein weiterhin opakes Ergebnis verwerfen.
+  - `hero-stat-callout` nur bei einer numerischen Aussage zulassen. `heroValue` muss genau eine vom Template parsebare Zahl enthalten; `bgColor` muss eine gültige Hexfarbe mit mindestens 4,5:1 Kontrast zu `#171717` sein. Ungültige Worker-Props werden einmal mit konkretem Validierungsfehler neu angefordert und danach abgelehnt.
+  - Overlay-Manifeste um `visual_qc` mit Darstellungsmodus, Alpha-Abdeckung, Farbkontrast und Prop-Status ergänzen.
+  - Diese lokalen Messwerte als verbindliche QC-Findings in das finale Ergebnis übernehmen. A7 darf bildabhängige Prüfungen ohne echte Bilddaten nur noch als `unmeasurable`, nicht als `pass`, melden.
+
+- **Env-Start**
+  - `scripts/serve.ps1` und `scripts/serve.sh` als kanonische Launcher hinzufügen; beide verwenden die offiziell unterstützte [`--no-env-file`-Option](https://docs.astral.sh/uv/reference/cli/#uv-run).
+  - Injizierte Prozessvariablen bleiben damit maßgeblich; Palantums bestehender `.env`-Loader ergänzt weiterhin ausschließlich fehlende Werte.
+  - Quickstart und `.env.example` dokumentieren getrennt den lokalen `.env`-Modus und den sicheren Injected-Environment-Modus.
+
+## Schnittstellen
+
+- Keine bestehenden HTTP-Endpunkte werden gebrochen.
+- Chunk-Overlay-Objekte erhalten optional:
+  - `visual_qc.presentation`
+  - `visual_qc.max_alpha_coverage`
+  - `visual_qc.contrast_ratio`
+  - `visual_qc.verdict`
+- Alte Kataloge werden durch die Schema-/Curation-Version automatisch neu erzeugt; alte Chunk-Manifeste ohne `visual_qc` bleiben lesbar.
+
+## Testplan
+
+- Prompttests für Float-Rauschen, lange irrelevante Transkripte, Kandidatenpriorität, 28.000-Zeichen-Budget und lokalen Oversize-Abbruch ohne HTTP-Aufruf.
+- Motiontests für numerische Werte, dunkle Farben, Inset-Geometrie, Alpha-Neurendering und Ablehnung weiterhin opaker Ergebnisse.
+- QC-Tests, dass lokale Motion-Fehler den Gesamtentscheid auf `fail` setzen und blinde A7-Prüfungen nicht als bestanden erscheinen.
+- Env-Tests mit widersprüchlichem `.env`- und Prozesswert sowie Smoke-Tests beider Launcher.
+- Abschließend vollständiges Pytest, Ruff, `mypy palantum` und `git diff --check`.
+
+## Annahmen
+
+- Variante B bleibt verpflichtend eine echte Motion-Alternative; fehlende sichere Szenen erzeugen einen klaren Variantenfehler statt eines verdeckten A-Rolls.
+- Die externen Motion-Pack-Quellen werden nicht verändert oder ins Repository aufgenommen.
+- Die untracked MP4-Dateien und `uploads/` bleiben unangetastet.
+- Der einmalige Windows-`os.replace`-Fehler der Baseline gilt als transient, da der isolierte Wiederholungstest bestand; bei erneuter Reproduktion wird er separat gehärtet.
+
+---
+
+zu github pushen und eine checkpoint erstellen

@@ -3,9 +3,24 @@
   "checkpoint_id": "01M0PBFZNVRKHRYEQKEJS2AC9W",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 11,
+  "checkpoints_count": 12,
   "files_touched": [
+    ".env.example",
+    "README.md",
+    "docs/motion-pack.md",
+    "palantum/agents/backends/devin.py",
+    "palantum/agents/prompts/a6_graphics_director.md",
+    "palantum/agents/prompts/a6_slot_worker.md",
+    "palantum/agents/prompts/a7_qc.md",
+    "palantum/motion/catalog.py",
+    "palantum/motion/harness.py",
     "palantum/orchestrator.py",
+    "scripts/serve.ps1",
+    "scripts/serve.sh",
+    "tests/test_chunks.py",
+    "tests/test_devin.py",
+    "tests/test_motion.py",
+    "tests/test_orchestrator_motion.py",
     "tests/test_web.py"
   ],
   "sessions": [
@@ -22,13 +37,20 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 150883,
+    "input_tokens": 668909,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 8921413,
-    "output_tokens": 33696,
-    "api_call_count": 97
+    "cache_read_tokens": 21906757,
+    "output_tokens": 86895,
+    "api_call_count": 191
   }
 }
