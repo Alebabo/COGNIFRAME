@@ -7,10 +7,12 @@ import shutil
 import subprocess
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from palantum.agents.backends.devin import DEVIN_PROMPT_BUDGET_CHARS, serialize_prompt
 from palantum.agents.runner import run_role
 from palantum.engine.transcribe import transcribe
 from palantum.engine.videouse import (
@@ -110,6 +112,23 @@ def _file_free_probe_context(result: ProbeResult) -> dict[str, Any]:
         "height": result.height,
         "fps": result.fps,
         "has_audio": result.has_audio,
+    }
+
+
+def _compact_word_index(word_index: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Round ASR timestamp noise before embedding the index in an agent prompt."""
+    return {
+        str(source): [
+            {
+                "text": str(item["text"]),
+                "start": round(float(item["start"]), 3),
+                "end": round(float(item["end"]), 3),
+            }
+            for item in words
+            if isinstance(item, dict)
+        ]
+        for source, words in word_index.items()
+        if isinstance(words, list)
     }
 
 
@@ -218,6 +237,46 @@ def _normalize_qc_verdict(report: dict[str, Any]) -> dict[str, Any]:
             else "pass"
         )
     return report
+
+
+def _merge_motion_qc(
+    report: dict[str, Any], overlays: list[dict[str, Any]]
+) -> dict[str, Any]:
+    findings = list(report.get("findings", []))
+    for overlay in overlays:
+        visual = overlay.get("visual_qc")
+        where = f"{float(overlay.get('start_in_output', 0)):.3f}s"
+        if not isinstance(visual, dict):
+            findings.append(
+                {
+                    "check": "Motion overlay visibility",
+                    "verdict": "unmeasurable",
+                    "measured": "legacy overlay has no local visual measurements",
+                    "expected": "alpha coverage <=35% and validated props",
+                    "where": where,
+                    "fix": "re-render the overlay with the current motion harness",
+                }
+            )
+            continue
+        verdict = "pass" if visual.get("verdict") == "pass" else "fail"
+        findings.append(
+            {
+                "check": "Motion overlay visibility",
+                "verdict": verdict,
+                "measured": (
+                    f"presentation={visual.get('presentation')}, "
+                    f"alpha={float(visual.get('max_alpha_coverage', 1)):.1%}, "
+                    f"contrast={visual.get('contrast_ratio')}"
+                ),
+                "expected": "alpha coverage <=35%, contrast >=4.5:1 when applicable",
+                "where": where,
+                "fix": "render as an inset with valid numeric and color props"
+                if verdict == "fail"
+                else "",
+            }
+        )
+    report["findings"] = findings
+    return _normalize_qc_verdict(report)
 
 
 def _apply_coverage(
@@ -589,6 +648,9 @@ def _validate_overlay_plan(
         enriched = dict(overlay)
         enriched["start_in_output"] = start
         enriched["duration"] = duration
+        enriched["timeline_quote"] = " ".join(
+            str(item.get("quote", "")) for item in containing_windows
+        ).strip()
         enriched["scene"] = scene
         validated.append(enriched)
     ordered = sorted(validated, key=lambda item: float(item["start_in_output"]))
@@ -601,6 +663,107 @@ def _validate_overlay_plan(
     return validated
 
 
+_ALPHA_COVERAGE_LIMIT = 0.35
+_HERO_VALUE_PATTERN = re.compile(r"^[^0-9.]*[0-9]+(?:\.[0-9]+)?[^0-9.]*$")
+
+
+def _scene_default(scene: dict[str, Any], key: str) -> str:
+    return next(
+        (
+            str(item.get("default", ""))
+            for item in scene.get("slots", [])
+            if isinstance(item, dict) and item.get("key") == key
+        ),
+        "",
+    )
+
+
+def _hex_rgb(value: str) -> tuple[int, int, int]:
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+        raise ValueError(f"expected #RRGGBB color, got {value!r}")
+    return (
+        int(value[1:3], 16),
+        int(value[3:5], 16),
+        int(value[5:7], 16),
+    )
+
+
+def _relative_luminance(color: tuple[int, int, int]) -> float:
+    channels = []
+    for raw in color:
+        value = raw / 255
+        channels.append(value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+
+
+def _contrast_ratio(foreground: str, background: str) -> float:
+    left = _relative_luminance(_hex_rgb(foreground))
+    right = _relative_luminance(_hex_rgb(background))
+    lighter, darker = max(left, right), min(left, right)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _validate_motion_props(scene: dict[str, Any], props: dict[str, Any]) -> dict[str, Any]:
+    contrast: float | None = None
+    if str(scene.get("id")) == "hero-stat-callout":
+        if "heroValue" not in props:
+            raise ValueError("hero-stat-callout heroValue must come from the timeline claim")
+        hero_value = str(props["heroValue"])
+        if not _HERO_VALUE_PATTERN.fullmatch(hero_value):
+            raise ValueError(
+                "hero-stat-callout heroValue must contain exactly one parseable number"
+            )
+        background = str(props.get("bgColor", _scene_default(scene, "bgColor")))
+        foreground = str(scene.get("fixed_text_color") or "#171717")
+        contrast = _contrast_ratio(foreground, background)
+        if contrast < 4.5:
+            raise ValueError(
+                f"hero-stat-callout bgColor contrast is {contrast:.2f}:1; expected >=4.5:1"
+            )
+    return {
+        "prop_checks": "pass",
+        "contrast_ratio": round(contrast, 3) if contrast is not None else None,
+    }
+
+
+def _alpha_coverage(output: Path, duration_s: float) -> float:
+    coverages: list[float] = []
+    for fraction in (0.25, 0.5, 0.75):
+        raw = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "info",
+                "-ss",
+                f"{duration_s * fraction:.3f}",
+                "-i",
+                str(output),
+                "-frames:v",
+                "1",
+                "-vf",
+                "alphaextract,format=gray,signalstats,metadata=print:file=-",
+                "-f",
+                "null",
+                "-",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        values = [
+            float(value) / 255
+            for value in re.findall(
+                r"lavfi\.signalstats\.YAVG=([0-9]+(?:\.[0-9]+)?)",
+                f"{raw.stdout}\n{raw.stderr}",
+            )
+        ]
+        if not values:
+            raise ValueError(f"ffmpeg reported no alpha measurements for {output}")
+        coverages.append(max(values))
+    return max(coverages)
+
+
 def _render_motion_job(
     edit_dir: Path,
     source: Path,
@@ -610,17 +773,35 @@ def _render_motion_job(
     *,
     resume: bool = False,
 ) -> dict[str, Any]:
+    scene = overlay["scene"]
+    if not isinstance(scene, dict):
+        raise ValueError("motion overlay has no validated scene")
+    prop_qc = _validate_motion_props(scene, props)
+    expected_presentation = str(scene.get("presentation", "overlay"))
+    slot_id = str(overlay["slot_id"])
+    existing_slot = edit_dir / "animations" / f"slot_{slot_id}"
+    existing_output = existing_slot / "render.mov"
+    existing_manifest_path = existing_slot / "palantum-slot.json"
+    existing_presentation = None
+    if existing_manifest_path.exists():
+        with suppress(OSError, ValueError, json.JSONDecodeError):
+            existing_presentation = _read_json(existing_manifest_path).get("presentation")
     slot = materialize_scene(
         source,
         str(overlay["template_id"]),
         edit_dir,
         props,
-        slot_id=str(overlay["slot_id"]),
+        slot_id=slot_id,
         target_width=target_size[0],
         target_height=target_size[1],
     )
     output = slot / "render.mov"
-    if not (resume and output.is_file()):
+    reuse = (
+        resume
+        and existing_output.is_file()
+        and existing_presentation in {expected_presentation, "inset"}
+    )
+    if not reuse:
         subprocess.run(
             _npm_install_command(),
             cwd=slot,
@@ -629,6 +810,28 @@ def _render_motion_job(
         subprocess.run(build_render_command(slot, output), cwd=slot, check=True)
     if not output.is_file():
         raise RuntimeError(f"Remotion did not create {output}")
+    presentation = str(existing_presentation) if reuse else expected_presentation
+    coverage = _alpha_coverage(output, float(scene["duration_s"]))
+    if coverage > _ALPHA_COVERAGE_LIMIT and presentation != "inset":
+        slot = materialize_scene(
+            source,
+            str(overlay["template_id"]),
+            edit_dir,
+            props,
+            slot_id=slot_id,
+            target_width=target_size[0],
+            target_height=target_size[1],
+            presentation="inset",
+        )
+        output = slot / "render.mov"
+        subprocess.run(build_render_command(slot, output), cwd=slot, check=True)
+        presentation = "inset"
+        coverage = _alpha_coverage(output, float(scene["duration_s"]))
+    if coverage > _ALPHA_COVERAGE_LIMIT:
+        raise ValueError(
+            f"motion overlay {slot_id} covers {coverage:.1%} of the frame; "
+            f"expected <= {_ALPHA_COVERAGE_LIMIT:.0%}"
+        )
     return {
         "file": output.relative_to(edit_dir).as_posix(),
         "start_in_output": float(overlay["start_in_output"]),
@@ -636,6 +839,13 @@ def _render_motion_job(
         "slot_id": str(overlay["slot_id"]),
         "template_id": str(overlay["template_id"]),
         "beat": str(overlay["beat"]),
+        "visual_qc": {
+            "presentation": presentation,
+            "max_alpha_coverage": round(coverage, 4),
+            "contrast_ratio": prop_qc["contrast_ratio"],
+            "prop_checks": prop_qc["prop_checks"],
+            "verdict": "pass",
+        },
     }
 
 
@@ -673,6 +883,12 @@ def _graphics_overlays(
         scenes = _single_motion_scenes(catalog, beats.pop())
     else:
         scenes = _selectable_scenes(catalog)
+    has_numeric_claim = any(re.search(r"\d", str(item.get("quote", ""))) for item in timeline)
+    scenes = [
+        scene
+        for scene in scenes
+        if not scene.get("requires_numeric_claim") or has_numeric_claim
+    ]
     if not scenes:
         if required_overlays:
             raise RuntimeError("the motion variant has no usable scene")
@@ -707,24 +923,38 @@ def _graphics_overlays(
             "scene": overlay["scene"],
             "brand": state.get("brand", {}),
         }
-        checked = _cached_role(
-            edit_dir,
-            f"A6W-{slot_id}",
-            "A6W",
-            _prompt("A6W"),
-            worker_context,
-            resume=resume,
-        )
-        if checked["slot_id"] != slot_id or checked["template_id"] != overlay["template_id"]:
-            raise ValueError(f"A6 slot worker changed the identity of {slot_id}")
-        return _render_motion_job(
-            edit_dir,
-            source,
-            overlay,
-            checked["props"],
-            target_size,
-            resume=resume,
-        )
+        last_error: ValueError | None = None
+        for attempt in range(2):
+            cache_key = f"A6W-{slot_id}" + ("-retry" if attempt else "")
+            checked = _cached_role(
+                edit_dir,
+                cache_key,
+                "A6W",
+                _prompt("A6W"),
+                worker_context,
+                resume=resume,
+            )
+            if (
+                checked["slot_id"] != slot_id
+                or checked["template_id"] != overlay["template_id"]
+            ):
+                raise ValueError(f"A6 slot worker changed the identity of {slot_id}")
+            try:
+                _validate_motion_props(overlay["scene"], checked["props"])
+            except ValueError as error:
+                last_error = error
+                worker_context["_validation_error"] = str(error)
+                continue
+            return _render_motion_job(
+                edit_dir,
+                source,
+                overlay,
+                checked["props"],
+                target_size,
+                resume=resume,
+            )
+        assert last_error is not None
+        raise last_error
 
     with ThreadPoolExecutor(max_workers=min(4, max(1, len(overlays)))) as executor:
         return list(executor.map(worker, overlays))
@@ -753,6 +983,270 @@ _CHUNK_VARIANTS = (
         "motion": True,
     },
 )
+
+
+_A4_WINDOW_PADDING_S = 0.5
+_A4_MAX_CANDIDATES_PER_BEAT = 4
+
+
+def _candidate_key(candidate: dict[str, Any]) -> tuple[str, float, float]:
+    return (
+        str(candidate.get("source", "")),
+        round(float(candidate.get("start", 0)), 3),
+        round(float(candidate.get("end", 0)), 3),
+    )
+
+
+def _selected_candidate_index(
+    candidates: list[dict[str, Any]], director_beat: dict[str, Any]
+) -> int | None:
+    source = str(director_beat.get("source") or "")
+    selected_range = director_beat.get("range")
+    if not source or not isinstance(selected_range, list) or len(selected_range) != 2:
+        return None
+    selected_start = float(selected_range[0])
+    selected_end = float(selected_range[1])
+    matches = [
+        (index, abs(float(item.get("start", 0)) - selected_start))
+        for index, item in enumerate(candidates)
+        if str(item.get("source", "")) == source
+        and float(item.get("end", 0)) >= selected_start - 1e-3
+        and float(item.get("start", 0)) <= selected_end + 1e-3
+    ]
+    return min(matches, key=lambda item: item[1])[0] if matches else None
+
+
+def _director_candidate(
+    base_context: dict[str, Any], director_beat: dict[str, Any]
+) -> dict[str, Any] | None:
+    source = str(director_beat.get("source") or "")
+    selected_range = director_beat.get("range")
+    if not source or not isinstance(selected_range, list) or len(selected_range) != 2:
+        return None
+    start = float(selected_range[0])
+    end = float(selected_range[1])
+    if end <= start:
+        return None
+    raw_index = base_context.get("word_index", {})
+    words = raw_index.get(source, []) if isinstance(raw_index, dict) else []
+    quote = " ".join(
+        str(item.get("text", ""))
+        for item in words
+        if isinstance(item, dict)
+        and float(item.get("end", 0)) >= start
+        and float(item.get("start", 0)) <= end
+    ).strip()
+    return {"source": source, "start": start, "end": end, "quote": quote}
+
+
+def _a4_candidates(
+    base_context: dict[str, Any], *, beat: str | None, candidate_limit: int
+) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+    director = base_context.get("director", {})
+    director_beats = director.get("beats", []) if isinstance(director, dict) else []
+    supervisor = base_context.get("script_supervisor", {})
+    raw_groups = (
+        supervisor.get("beat_candidates", []) if isinstance(supervisor, dict) else []
+    )
+    candidates_by_beat = {
+        str(group.get("beat")): [
+            dict(item)
+            for item in group.get("candidates", [])
+            if isinstance(item, dict)
+        ]
+        for group in raw_groups
+        if isinstance(group, dict) and isinstance(group.get("candidates"), list)
+    }
+    reduced_beats: list[dict[str, Any]] = []
+    selected_by_beat: dict[str, list[dict[str, Any]]] = {}
+    for value in director_beats:
+        if not isinstance(value, dict):
+            continue
+        beat_id = str(value.get("id", ""))
+        if not beat_id or (beat is not None and beat_id != beat):
+            continue
+        reduced = {
+            key: value[key]
+            for key in ("id", "status", "source", "range", "reason")
+            if key in value
+        }
+        reduced_beats.append(reduced)
+        raw_candidates = candidates_by_beat.get(beat_id, [])
+        selected_index = _selected_candidate_index(raw_candidates, value)
+        if selected_index is not None:
+            ordered = [raw_candidates[selected_index]] + [
+                item for index, item in enumerate(raw_candidates) if index != selected_index
+            ]
+        else:
+            selected = _director_candidate(base_context, value)
+            ordered = ([selected] if selected is not None else []) + raw_candidates
+        unique: list[dict[str, Any]] = []
+        seen: set[tuple[str, float, float]] = set()
+        for candidate in ordered:
+            key = _candidate_key(candidate)
+            if not key[0] or key in seen or key[2] <= key[1]:
+                continue
+            seen.add(key)
+            unique.append(
+                {
+                    "source": key[0],
+                    "start": key[1],
+                    "end": key[2],
+                    "quote": str(candidate.get("quote", "")),
+                }
+            )
+            if len(unique) >= candidate_limit:
+                break
+        selected_by_beat[beat_id] = unique
+    return reduced_beats, selected_by_beat
+
+
+def _a4_word_index(
+    word_index: dict[str, Any], candidates: dict[str, list[dict[str, Any]]]
+) -> dict[str, list[dict[str, Any]]]:
+    windows_by_source: dict[str, list[tuple[float, float]]] = {}
+    for values in candidates.values():
+        for candidate in values:
+            windows_by_source.setdefault(str(candidate["source"]), []).append(
+                (
+                    float(candidate["start"]) - _A4_WINDOW_PADDING_S,
+                    float(candidate["end"]) + _A4_WINDOW_PADDING_S,
+                )
+            )
+    filtered: dict[str, list[dict[str, Any]]] = {}
+    for source, windows in windows_by_source.items():
+        words = word_index.get(source, [])
+        if not isinstance(words, list):
+            continue
+        filtered[source] = [
+            item
+            for item in words
+            if isinstance(item, dict)
+            and any(
+                float(item.get("end", 0)) >= start
+                and float(item.get("start", 0)) <= end
+                for start, end in windows
+            )
+        ]
+    return _compact_word_index(filtered)
+
+
+def _a4_packed_candidates(candidates: dict[str, list[dict[str, Any]]]) -> str:
+    lines = ["# Packed candidate transcripts", ""]
+    by_source: dict[str, list[dict[str, Any]]] = {}
+    for values in candidates.values():
+        for candidate in values:
+            by_source.setdefault(str(candidate["source"]), []).append(candidate)
+    for source, values in by_source.items():
+        lines.append(f"## {source}")
+        for candidate in values:
+            lines.append(
+                f"  [{float(candidate['start']):.3f}-{float(candidate['end']):.3f}] "
+                f"{str(candidate.get('quote', ''))}"
+            )
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _a4_supervisor_context(
+    supervisor: dict[str, Any], candidates: dict[str, list[dict[str, Any]]]
+) -> dict[str, Any]:
+    windows_by_source: dict[str, list[tuple[float, float]]] = {}
+    for values in candidates.values():
+        for candidate in values:
+            windows_by_source.setdefault(str(candidate["source"]), []).append(
+                (float(candidate["start"]), float(candidate["end"]))
+            )
+    takes = []
+    for value in supervisor.get("takes", []):
+        if not isinstance(value, dict):
+            continue
+        source = str(value.get("id", ""))
+        windows = windows_by_source.get(source)
+        if not windows:
+            continue
+        slips = [
+            dict(item)
+            for item in value.get("slips", [])
+            if isinstance(item, dict)
+            and any(
+                float(item.get("end", 0)) >= start
+                and float(item.get("start", 0)) <= end
+                for start, end in windows
+            )
+        ]
+        take = {"id": source, "slips": slips}
+        if "duration_s" in value:
+            take["duration_s"] = value["duration_s"]
+        takes.append(take)
+    return {
+        "takes": takes,
+        "beat_candidates": [
+            {"beat": beat, "candidates": values}
+            for beat, values in candidates.items()
+        ],
+    }
+
+
+def _compact_a4_context(
+    base_context: dict[str, Any], *, beat: str | None, candidate_limit: int
+) -> dict[str, Any]:
+    reduced_beats, candidates = _a4_candidates(
+        base_context, beat=beat, candidate_limit=candidate_limit
+    )
+    director = base_context.get("director", {})
+    supervisor = base_context.get("script_supervisor", {})
+    word_index = base_context.get("word_index", {})
+    context: dict[str, Any] = {
+        key: base_context[key]
+        for key in ("run_number", "_session_state_path", "_manifest_generation", "schema")
+        if key in base_context
+    }
+    context.update(
+        {
+            "director": {
+                "beats": reduced_beats,
+                "beat_order": [str(item["id"]) for item in reduced_beats],
+                "order_reason": (
+                    str(director.get("order_reason", ""))
+                    if isinstance(director, dict)
+                    else ""
+                ),
+            },
+            "script_supervisor": _a4_supervisor_context(
+                supervisor if isinstance(supervisor, dict) else {}, candidates
+            ),
+            "takes_packed": _a4_packed_candidates(candidates),
+            "word_index": _a4_word_index(
+                word_index if isinstance(word_index, dict) else {}, candidates
+            ),
+        }
+    )
+    return context
+
+
+def _budgeted_a4_context(
+    base_context: dict[str, Any],
+    prompt: str,
+    *,
+    beat: str | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    last_size = 0
+    for candidate_limit in range(_A4_MAX_CANDIDATES_PER_BEAT, 0, -1):
+        context = _compact_a4_context(
+            base_context, beat=beat, candidate_limit=candidate_limit
+        )
+        if extra:
+            context.update(extra)
+        last_size = len(serialize_prompt(prompt, context))
+        if last_size <= DEVIN_PROMPT_BUDGET_CHARS:
+            return context
+    scope = beat or "all beats"
+    raise ValueError(
+        f"A4 prompt for {scope} has {last_size} characters after compaction; "
+        f"the safe budget is {DEVIN_PROMPT_BUDGET_CHARS}"
+    )
 
 
 def _chunk_groups(ranges: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -820,30 +1314,26 @@ def _build_chunk_variant(
 ) -> dict[str, Any]:
     variant_id = str(variant["id"])
     variant_dir = edit_dir / "chunks" / str(chunk["id"]) / variant_id
-    director = base_context["director"]
-    beats = [
-        item for item in director.get("beats", []) if str(item.get("id")) == str(chunk["beat"])
-    ]
-    context = {
-        **base_context,
+    prompt = _prompt("A4")
+    context = _budgeted_a4_context(
+        base_context,
+        prompt,
+        beat=str(chunk["beat"]),
+        extra={
         "_session_key": f"{chunk['id']}.{variant_id}",
-        "director": {
-            "beats": beats,
-            "beat_order": [chunk["beat"]],
-            "order_reason": "This agent edits one independently selectable chunk.",
-        },
         "chunk": chunk,
         "variant": {
             "id": variant_id,
             "name": variant["name"],
             "direction": variant["direction"],
         },
-    }
+        },
+    )
     decision = _cached_role(
         edit_dir,
         f"A4-{chunk['id']}-{variant_id}",
         "A4",
-        _prompt("A4"),
+        prompt,
         context,
         resume=resume,
     )
@@ -1048,12 +1538,13 @@ def build_chunk_variants(
     base_context = _chunk_base_context(
         edit_dir, state, manifest_generation=generation
     )
+    a4_prompt = _prompt("A4")
     chunk_plan = _cached_role(
         edit_dir,
         "A4-chunk-plan",
         "A4",
-        _prompt("A4"),
-        base_context,
+        a4_prompt,
+        _budgeted_a4_context(base_context, a4_prompt),
         resume=resume,
     )
     chunks = _chunk_groups(chunk_plan["ranges"])
@@ -1193,7 +1684,9 @@ def finalize_chunk_variants(edit_dir: Path) -> tuple[dict[str, Any], dict[str, A
         "timeline_views": _timeline_views(output, ranges, edit_dir),
         "subtitle_file": str(edit_dir / "master.srt"),
     }
-    qc = _normalize_qc_verdict(run_role("A7", _prompt("A7"), qc_context, None))
+    qc = _merge_motion_qc(
+        run_role("A7", _prompt("A7"), qc_context, None), edl["overlays"]
+    )
     _write_json(edit_dir / "qc.json", qc)
     manifest["status"] = "done"
     _write_json(manifest_path, manifest)
@@ -1275,7 +1768,9 @@ def cut(
         "timeline_views": views,
         "subtitle_file": str(edit_dir / "master.srt"),
     }
-    a7 = _normalize_qc_verdict(run_role("A7", _prompt("A7"), qc_context, None))
+    a7 = _merge_motion_qc(
+        run_role("A7", _prompt("A7"), qc_context, None), edl["overlays"]
+    )
     if a7.get("verdict") == "fail":
         retry_context = dict(context)
         retry_context["qc_findings"] = a7
@@ -1312,7 +1807,9 @@ def cut(
         qc_context["duration_check"] = _duration_check(expected_total, measured)
         qc_context["audio_check"] = _audio_check(output, edl["ranges"])
         qc_context["timeline_views"] = _timeline_views(output, a4["ranges"], edit_dir)
-        a7 = _normalize_qc_verdict(run_role("A7", _prompt("A7"), qc_context, None))
+        a7 = _merge_motion_qc(
+            run_role("A7", _prompt("A7"), qc_context, None), edl["overlays"]
+        )
     (edit_dir / "qc.json").write_text(
         json.dumps(a7, indent=2, ensure_ascii=False), encoding="utf-8"
     )

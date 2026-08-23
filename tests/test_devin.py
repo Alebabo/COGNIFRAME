@@ -7,7 +7,7 @@ from unittest.mock import call as mock_call
 import pytest
 import requests
 
-from palantum.agents.backends.devin import call
+from palantum.agents.backends.devin import DEVIN_PROMPT_LIMIT_CHARS, call, serialize_prompt
 
 
 def _response(
@@ -18,6 +18,24 @@ def _response(
     response.status_code = status_code
     response.text = text
     return response
+
+
+def test_oversized_prompt_is_rejected_before_network_access() -> None:
+    context = {"text": "x" * DEVIN_PROMPT_LIMIT_CHARS}
+    with (
+        patch.dict("os.environ", {"DEVIN_API_KEY": "key"}, clear=True),
+        patch("palantum.agents.backends.devin.requests.post") as post,
+        pytest.raises(ValueError, match=r"prompt has .* limit is <30000"),
+    ):
+        call("A4", "cut", context, {"type": "object"})
+
+    post.assert_not_called()
+
+
+def test_serialize_prompt_matches_transport_wire_format() -> None:
+    assert serialize_prompt("cut", {"quote": "Grün"}) == (
+        'cut\n\nINPUT JSON:\n{"quote":"Grün"}'
+    )
 
 
 def test_finished_session_returns_structured_output_and_creation_url() -> None:

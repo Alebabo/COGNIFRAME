@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
-CATALOG_SCHEMA_VERSION = 1
-CURATION_VERSION = 1
+CATALOG_SCHEMA_VERSION = 2
+CURATION_VERSION = 2
 
 # This is deliberately a small allowlist. The original template sources remain in the
 # user-supplied pack and are not redistributed with Palantum.
@@ -18,6 +18,9 @@ CURATED_SCENES: dict[str, dict[str, Any]] = {
     "hero-stat-callout": {
         "beat_type": "PROBLEM",
         "confidence": 0.95,
+        "presentation": "inset",
+        "requires_numeric_claim": True,
+        "fixed_text_color": "#171717",
         "max_chars": {"heroValue": 12, "heroLabel": 40, "stats": 120, "bgColor": 32},
     },
     "bar-chart-reveal": {
@@ -244,6 +247,9 @@ def _scene(reader: PackReader, entry: dict[str, Any], curated: dict[str, Any]) -
         "name": str(metadata.get("name", scene_id)),
         "beat_type": str(curated["beat_type"]),
         "confidence": float(curated["confidence"]),
+        "presentation": str(curated.get("presentation", "overlay")),
+        "requires_numeric_claim": bool(curated.get("requires_numeric_claim", False)),
+        "fixed_text_color": curated.get("fixed_text_color"),
         "engine": "remotion",
         "component_name": component_name,
         "component_path": component_path,

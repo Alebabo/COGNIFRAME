@@ -85,6 +85,8 @@ def test_catalog_scans_folder_and_reuses_hash_cache(tmp_path: Path) -> None:
     assert first["scenes"][0]["broken_reason"] is None
     assert first["scenes"][0]["slots"][0]["default"] == "Default"
     assert first["scenes"][0]["slots"][0]["max_chars"] >= len("Default")
+    assert first["scenes"][0]["presentation"] == "inset"
+    assert first["scenes"][0]["requires_numeric_claim"] is True
 
 
 def test_catalog_scans_prefixed_zip_and_marks_broken_source(tmp_path: Path) -> None:
@@ -110,6 +112,7 @@ def test_materialize_creates_isolated_harness_and_validates_props(tmp_path: Path
     assert "HeroStatCallout" in (slot / "src/Root.tsx").read_text()
     assert json.loads((slot / "props.json").read_text()) == {"title": "Traction"}
     assert json.loads((slot / "palantum-slot.json").read_text())["source_sha256"]
+    assert json.loads((slot / "palantum-slot.json").read_text())["presentation"] == "inset"
     command = build_render_command(slot)
     if os.name == "nt":
         assert command[1:5] == ["/d", "/s", "/c", "npx"]
@@ -136,7 +139,10 @@ def test_materialize_creates_isolated_harness_and_validates_props(tmp_path: Path
     )
     portrait_manifest = json.loads((portrait / "palantum-slot.json").read_text())
     assert (portrait_manifest["target_width"], portrait_manifest["target_height"]) == (1080, 1920)
-    assert "scale(0.56250000)" in (portrait / "src/Root.tsx").read_text()
+    root = (portrait / "src/Root.tsx").read_text()
+    assert "scale(0.29250000)" in root
+    assert "top: '76.80px'" in root
+    assert "right: '43.20px'" in root
 
     with pytest.raises(ValueError, match="undeclared"):
         materialize_scene(archive, "hero-stat-callout", edit, {"other": "value"})

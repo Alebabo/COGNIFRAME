@@ -20,14 +20,18 @@ curated scene descriptions and slot defaults.
 validated props and exact dependency versions. Install its npm dependencies inside the Devin
 snapshot, then execute the list returned by `build_render_command()` to request a ProRes 4444 MOV.
 
-The built-in parser is a fast source-integrity gate, not a replacement for a Remotion build or
-probe render. A scene must still be rendered and visually checked before production use. ProRes
-4444 supports alpha, but a template that paints an opaque background remains opaque. The supplied
-templates are 1920x1080 while Palantum's pitch schema is 1080x1920; placement or adaptation must be
-explicit rather than silently cropping the composition. The generated harness renders at the
-detected delivery orientation and centers the original scene with a contain transform. Landscape
-delivery remains 1920x1080; portrait delivery is 1080x1920 with transparent space around the fitted
-scene wherever the selected template itself does not paint a background.
+The built-in parser is a fast source-integrity gate, not a replacement for a Remotion build. Every
+render is sampled at 25%, 50%, and 75% of its duration and its alpha coverage is measured with
+FFmpeg. A composition that covers more than 35% of the delivery frame is rendered once more as a
+transparent, top-right inset; it is rejected if it remains too opaque. Known full-bleed scenes are
+catalogued as insets from the start. The generated harness always renders at the detected delivery
+orientation, so landscape delivery remains 1920x1080 and portrait delivery is 1080x1920.
+
+Scene-specific prop checks run before rendering. In particular, `hero-stat-callout` is available
+only for timeline quotes with a numeric claim, its `heroValue` must contain one number understood by
+the template, and its background must maintain at least 4.5:1 contrast against the fixed text color.
+The resulting alpha, contrast, layout, and prop measurements are stored in each overlay's
+`visual_qc` block and are merged into final A7 QC as authoritative local findings.
 
 The pack README claims MIT licensing while also describing redistribution restrictions, and the
 archive has no license file. Keep the original pack outside the repository until provenance and

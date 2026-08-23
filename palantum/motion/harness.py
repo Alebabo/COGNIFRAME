@@ -81,6 +81,7 @@ def materialize_scene(
     slot_id: str | None = None,
     target_width: int | None = None,
     target_height: int | None = None,
+    presentation: str | None = None,
 ) -> Path:
     """Copy one curated scene into an isolated, renderable edit/animations slot."""
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", scene_id):
@@ -112,7 +113,28 @@ def materialize_scene(
     target_height = target_height or scene_height
     if target_width <= 0 or target_height <= 0:
         raise ValueError("target dimensions must be positive")
+    resolved_presentation = presentation or str(scene.get("presentation", "overlay"))
+    if resolved_presentation not in {"overlay", "inset"}:
+        raise ValueError(f"unsupported scene presentation: {resolved_presentation}")
     scale = min(target_width / scene_width, target_height / scene_height)
+    if resolved_presentation == "inset":
+        inset_width = target_width * 0.52
+        inset_height = target_height * 0.48
+        scale = min(inset_width / scene_width, inset_height / scene_height)
+        container_style = f"""
+      position: 'absolute',
+      top: '{target_height * 0.04:.2f}px',
+      right: '{target_width * 0.04:.2f}px',
+      borderRadius: '32px',
+      boxShadow: '0 18px 54px rgba(0,0,0,0.28)',
+      transform: 'scale({scale:.8f})',
+      transformOrigin: 'top right',"""
+    else:
+        container_style = f"""
+      position: 'relative',
+      flex: '0 0 auto',
+      transform: 'scale({scale:.8f})',
+      transformOrigin: 'center center',"""
     root = f"""import React from 'react';
 import {{AbsoluteFill, Composition}} from 'remotion';
 import props from '../props.json';
@@ -125,13 +147,10 @@ const SceneCanvas: React.FC = () => (
     justifyContent: 'center',
   }}}}>
     <div style={{{{
-      width: {scene_width},
-      height: {scene_height},
-      position: 'relative',
-      flex: '0 0 auto',
+    width: {scene_width},
+    height: {scene_height},
+{container_style}
       overflow: 'hidden',
-      transform: 'scale({scale:.8f})',
-      transformOrigin: 'center center',
     }}}}>
       <{component_name} {{...props}} />
     </div>
@@ -178,6 +197,7 @@ export const RemotionRoot: React.FC = () => (
         "output": "render.mov",
         "target_width": target_width,
         "target_height": target_height,
+        "presentation": resolved_presentation,
     }
     (slot / "palantum-slot.json").write_text(json.dumps(manifest, indent=2) + "\n")
     return slot

@@ -19,6 +19,8 @@ class DevinCallResult:
 
 SessionCreatedCallback = Callable[[str, str], None]
 _CACHED_ORG: tuple[str, str] | None = None
+DEVIN_PROMPT_LIMIT_CHARS = 30_000
+DEVIN_PROMPT_BUDGET_CHARS = 28_000
 
 
 @dataclass(frozen=True)
@@ -146,6 +148,14 @@ def _finished_result(
     return DevinCallResult(output=output, session_id=session_id, url=session_url)
 
 
+def serialize_prompt(prompt: str, context: dict[str, Any]) -> str:
+    """Build the exact prompt string counted by Devin's request limit."""
+    return (
+        f"{prompt}\n\nINPUT JSON:\n"
+        f"{json.dumps(context, ensure_ascii=False, separators=(',', ':'))}"
+    )
+
+
 def call(
     role_id: str,
     prompt: str,
@@ -155,14 +165,17 @@ def call(
     on_session_created: SessionCreatedCallback | None = None,
 ) -> DevinCallResult:
     """Run one structured Devin session (v3 with v1 fallback) and return its output and identity."""
+    serialized_prompt = serialize_prompt(prompt, context)
+    if len(serialized_prompt) >= DEVIN_PROMPT_LIMIT_CHARS:
+        raise ValueError(
+            f"Devin role {role_id} prompt has {len(serialized_prompt)} characters; "
+            f"the limit is <{DEVIN_PROMPT_LIMIT_CHARS}"
+        )
     transport = _resolve_transport()
     headers = _headers(transport.token)
     run_number = context.get("run_number", 0)
     payload: dict[str, Any] = {
-        "prompt": (
-            f"{prompt}\n\nINPUT JSON:\n"
-            f"{json.dumps(context, ensure_ascii=False, separators=(',', ':'))}"
-        ),
+        "prompt": serialized_prompt,
         "structured_output_schema": schema,
         "tags": [f"run-{run_number}", role_id],
         "title": f"Palantum {role_id} · run {run_number}",

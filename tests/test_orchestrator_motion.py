@@ -7,11 +7,15 @@ from unittest.mock import patch
 import pytest
 
 from palantum.orchestrator import (
+    _alpha_coverage,
     _cached_role,
     _graphics_overlays,
+    _merge_motion_qc,
     _npm_install_command,
+    _render_motion_job,
     _selectable_scenes,
     _single_motion_scenes,
+    _validate_motion_props,
     _validate_overlay_plan,
 )
 
@@ -66,12 +70,102 @@ def test_overlay_plan_enforces_catalog_slots_timing_and_non_overlap() -> None:
         _validate_overlay_plan([overlay, overlapping], scenes, timeline)
 
 
+def test_hero_props_require_numeric_value_and_readable_contrast() -> None:
+    scene = {
+        "id": "hero-stat-callout",
+        "fixed_text_color": "#171717",
+        "slots": [
+            {"key": "heroValue", "default": "17%"},
+            {"key": "bgColor", "default": "#FDD835"},
+        ],
+    }
+
+    checked = _validate_motion_props(
+        scene, {"heroValue": "$4.2M", "bgColor": "#FDD835"}
+    )
+    assert checked["prop_checks"] == "pass"
+    assert checked["contrast_ratio"] > 4.5
+    with pytest.raises(ValueError, match="parseable number"):
+        _validate_motion_props(scene, {"heroValue": "?", "bgColor": "#FDD835"})
+    with pytest.raises(ValueError, match="contrast"):
+        _validate_motion_props(scene, {"heroValue": "17%", "bgColor": "#0B0B0B"})
+
+
+def test_alpha_coverage_samples_three_points(tmp_path: Path) -> None:
+    output = tmp_path / "overlay.mov"
+    output.write_bytes(b"mov")
+    completed = type("Completed", (), {"stdout": "lavfi.signalstats.YAVG=63.75", "stderr": ""})()
+    with patch("palantum.orchestrator.subprocess.run", return_value=completed) as run:
+        assert _alpha_coverage(output, 4.0) == pytest.approx(0.25)
+
+    assert run.call_count == 3
+
+
+def test_opaque_unknown_scene_is_rerendered_as_inset(tmp_path: Path) -> None:
+    source = tmp_path / "templates.zip"
+    source.write_bytes(b"pack")
+    slot = tmp_path / "edit/animations/slot_problem-01"
+    slot.mkdir(parents=True)
+    (slot / "render.mov").write_bytes(b"mov")
+    overlay = {
+        "slot_id": "problem-01",
+        "template_id": "bar-chart-reveal",
+        "beat": "PROBLEM",
+        "start_in_output": 0.0,
+        "duration": 2.0,
+        "scene": {
+            "id": "bar-chart-reveal",
+            "duration_s": 3.0,
+            "presentation": "overlay",
+            "slots": [],
+        },
+    }
+    with (
+        patch("palantum.orchestrator.materialize_scene", return_value=slot) as materialize,
+        patch("palantum.orchestrator._alpha_coverage", side_effect=[1.0, 0.2]),
+        patch("palantum.orchestrator.subprocess.run"),
+    ):
+        result = _render_motion_job(
+            tmp_path / "edit", source, overlay, {}, (1920, 1080), resume=False
+        )
+
+    assert materialize.call_count == 2
+    assert materialize.call_args_list[1].kwargs["presentation"] == "inset"
+    assert result["visual_qc"] == {
+        "presentation": "inset",
+        "max_alpha_coverage": 0.2,
+        "contrast_ratio": None,
+        "prop_checks": "pass",
+        "verdict": "pass",
+    }
+
+
+def test_local_motion_qc_can_veto_a7_pass() -> None:
+    report = _merge_motion_qc(
+        {"findings": [], "verdict": "pass"},
+        [
+            {
+                "start_in_output": 1.0,
+                "visual_qc": {
+                    "presentation": "overlay",
+                    "max_alpha_coverage": 1.0,
+                    "contrast_ratio": 1.1,
+                    "verdict": "fail",
+                },
+            }
+        ],
+    )
+
+    assert report["verdict"] == "fail"
+    assert report["findings"][-1]["verdict"] == "fail"
+
+
 def test_graphics_director_runs_parallel_slot_workers_and_returns_edl_entries(
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "templates.zip"
     source.write_bytes(b"fixture")
-    scene = _scene("hero-stat-callout", "PROBLEM")
+    scene = _scene("bar-chart-reveal", "PROBLEM")
     catalog = {"source": {"sha256": "abc"}, "scenes": [scene]}
     ranges = [
         {
@@ -87,7 +181,7 @@ def test_graphics_director_runs_parallel_slot_workers_and_returns_edl_entries(
         "overlays": [
             {
                 "slot_id": "problem-01",
-                "template_id": "hero-stat-callout",
+                "template_id": "bar-chart-reveal",
                 "beat": "PROBLEM",
                 "start_in_output": 0.5,
                 "duration": 2.0,
@@ -102,7 +196,7 @@ def test_graphics_director_runs_parallel_slot_workers_and_returns_edl_entries(
             return plan
         return {
             "slot_id": "problem-01",
-            "template_id": "hero-stat-callout",
+            "template_id": "bar-chart-reveal",
             "props": {"title": "Pain"},
             "checks": ["identity", "limits", "brand", "timing"],
         }
@@ -112,7 +206,7 @@ def test_graphics_director_runs_parallel_slot_workers_and_returns_edl_entries(
         "start_in_output": 0.5,
         "duration": 2.0,
         "slot_id": "problem-01",
-        "template_id": "hero-stat-callout",
+        "template_id": "bar-chart-reveal",
         "beat": "PROBLEM",
     }
     with (
@@ -192,6 +286,118 @@ def test_required_motion_fails_when_pack_has_no_usable_scene(tmp_path: Path) -> 
             approved_catalog={"source": {"sha256": "abc"}, "scenes": []},
             required_overlays=1,
         )
+
+
+def test_numeric_scene_is_rejected_for_non_numeric_quote(tmp_path: Path) -> None:
+    source = tmp_path / "templates.zip"
+    source.write_bytes(b"fixture")
+    scene = _scene("hero-stat-callout", "PROBLEM") | {
+        "requires_numeric_claim": True,
+    }
+
+    with (
+        patch("palantum.orchestrator.run_role") as roles,
+        pytest.raises(RuntimeError, match="no usable scene"),
+    ):
+        _graphics_overlays(
+            tmp_path / "edit",
+            {"brand": {}},
+            [
+                {
+                    "source": "take",
+                    "start": 0.0,
+                    "end": 2.0,
+                    "beat": "PROBLEM",
+                    "quote": "The workflow is painfully slow",
+                }
+            ],
+            source,
+            (1920, 1080),
+            approved_catalog={"source": {"sha256": "abc"}, "scenes": [scene]},
+            required_overlays=1,
+        )
+
+    roles.assert_not_called()
+
+
+def test_invalid_worker_props_are_retried_once(tmp_path: Path) -> None:
+    source = tmp_path / "templates.zip"
+    source.write_bytes(b"fixture")
+    scene = _scene("hero-stat-callout", "PROBLEM") | {
+        "requires_numeric_claim": True,
+        "fixed_text_color": "#171717",
+        "slots": [
+            {"key": "heroValue", "max_chars": 12, "default": "17%"},
+            {"key": "bgColor", "max_chars": 32, "default": "#FDD835"},
+        ],
+    }
+    plan = {
+        "overlays": [
+            {
+                "slot_id": "problem-01",
+                "template_id": "hero-stat-callout",
+                "beat": "PROBLEM",
+                "start_in_output": 0.0,
+                "duration": 2.0,
+                "props": {"heroValue": "?", "bgColor": "#0B0B0B"},
+                "reason": "show the measured pain",
+            }
+        ]
+    }
+    worker_results = iter(
+        [
+            {
+                "slot_id": "problem-01",
+                "template_id": "hero-stat-callout",
+                "props": {"heroValue": "?", "bgColor": "#0B0B0B"},
+                "checks": [],
+            },
+            {
+                "slot_id": "problem-01",
+                "template_id": "hero-stat-callout",
+                "props": {"heroValue": "42%", "bgColor": "#FDD835"},
+                "checks": [],
+            },
+        ]
+    )
+
+    def run(role: str, *_args: object, **_kwargs: object) -> dict[str, object]:
+        return plan if role == "A6" else next(worker_results)
+
+    rendered = {
+        "file": "animations/slot_problem-01/render.mov",
+        "start_in_output": 0.0,
+        "duration": 2.0,
+        "slot_id": "problem-01",
+        "template_id": "hero-stat-callout",
+        "beat": "PROBLEM",
+    }
+    with (
+        patch("palantum.orchestrator.run_role", side_effect=run) as roles,
+        patch("palantum.orchestrator._render_motion_job", return_value=rendered) as render,
+    ):
+        result = _graphics_overlays(
+            tmp_path / "edit",
+            {"brand": {}},
+            [
+                {
+                    "source": "take",
+                    "start": 0.0,
+                    "end": 2.0,
+                    "beat": "PROBLEM",
+                    "quote": "42 percent of every day is lost",
+                }
+            ],
+            source,
+            (1920, 1080),
+            approved_catalog={"source": {"sha256": "abc"}, "scenes": [scene]},
+            required_overlays=1,
+        )
+
+    assert result == [rendered]
+    assert [call.args[0] for call in roles.call_args_list] == ["A6", "A6W", "A6W"]
+    assert "parseable number" in roles.call_args_list[-1].args[2]["_validation_error"]
+    assert render.call_args.args[3]["heroValue"] == "42%"
 
 
 def test_only_a0_approved_scenes_are_selectable() -> None:

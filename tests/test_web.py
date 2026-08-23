@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -9,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from palantum.web.app import (
     _finalize_selection,
+    _load_env,
     _process_chunk_recommendations,
     _process_upload,
     _sessions,
@@ -16,6 +18,22 @@ from palantum.web.app import (
     create_app,
     state_payload,
 )
+
+
+def test_local_env_never_overrides_injected_process_value(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("DEVIN_API_KEY=stale-local-key\n", encoding="utf-8")
+    with patch.dict(os.environ, {"DEVIN_API_KEY": "injected-key"}, clear=False):
+        with patch("palantum.web.app.Path.cwd", return_value=tmp_path):
+            _load_env()
+        assert os.environ["DEVIN_API_KEY"] == "injected-key"
+
+
+def test_safe_launchers_disable_uv_env_file_loading() -> None:
+    root = Path(__file__).resolve().parents[1]
+    powershell = (root / "scripts/serve.ps1").read_text()
+    assert '"--no-env-file"' in powershell
+    assert "& uv" in powershell
+    assert "uv run --no-env-file palantum" in (root / "scripts/serve.sh").read_text()
 
 
 def test_state_payload_maps_done_and_resolved_notes(tmp_path: Path) -> None:

@@ -6,14 +6,122 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
+from palantum.agents.backends.devin import DEVIN_PROMPT_BUDGET_CHARS, serialize_prompt
 from palantum.engine.videouse import ProbeResult
 from palantum.orchestrator import (
+    _budgeted_a4_context,
+    _compact_word_index,
     _recommend_chunk_variant,
     _variant_supervisor_context,
     build_chunk_variants,
     finalize_chunk_variants,
     recommend_chunk_variants,
 )
+
+
+def test_compact_word_index_rounds_timestamp_noise() -> None:
+    assert _compact_word_index(
+        {
+            "take": [
+                {"text": "hello", "start": 0.1234567, "end": 1.9876543},
+            ]
+        }
+    ) == {"take": [{"text": "hello", "start": 0.123, "end": 1.988}]}
+
+
+def test_a4_context_keeps_selected_candidate_and_drops_irrelevant_words() -> None:
+    candidates = [
+        {
+            "source": "take",
+            "start": float(index * 10),
+            "end": float(index * 10 + 2),
+            "quote": f"candidate {index}",
+        }
+        for index in range(5)
+    ]
+    base = {
+        "run_number": 1,
+        "schema": {"target_runtime_s": 60},
+        "director": {
+            "beats": [
+                {
+                    "id": "HOOK",
+                    "status": "covered",
+                    "source": "take",
+                    "range": [20.0, 22.0],
+                    "reason": "strongest",
+                },
+                {"id": "PROBLEM", "status": "missing"},
+            ],
+            "beat_order": ["HOOK", "PROBLEM"],
+        },
+        "script_supervisor": {
+            "takes": [
+                {
+                    "id": "take",
+                    "duration_s": 120,
+                    "slips": [
+                        {"start": 20.2, "end": 20.4, "kind": "misspeak"},
+                        {"start": 118.0, "end": 119.0, "kind": "false_start"},
+                    ],
+                }
+            ],
+            "beat_candidates": [{"beat": "HOOK", "candidates": candidates}],
+        },
+        "takes_packed": "irrelevant " * 10_000,
+        "word_index": {
+            "take": [
+                {"text": "near", "start": 20.123456, "end": 20.456789},
+                {"text": "far", "start": 119.0, "end": 119.5},
+            ]
+        },
+    }
+
+    context = _budgeted_a4_context(base, "cut", beat="HOOK")
+    kept = context["script_supervisor"]["beat_candidates"][0]["candidates"]
+
+    assert [item["start"] for item in kept] == [20.0, 0.0, 10.0, 30.0]
+    assert context["word_index"] == {
+        "take": [{"text": "near", "start": 20.123, "end": 20.457}]
+    }
+    assert context["director"]["beat_order"] == ["HOOK"]
+    assert context["script_supervisor"]["takes"][0]["slips"] == [
+        {"start": 20.2, "end": 20.4, "kind": "misspeak"}
+    ]
+    assert len(serialize_prompt("cut", context)) <= DEVIN_PROMPT_BUDGET_CHARS
+
+
+def test_a4_context_reports_minimal_prompt_that_cannot_fit_budget() -> None:
+    oversized = "x" * DEVIN_PROMPT_BUDGET_CHARS
+    base = {
+        "schema": {},
+        "director": {
+            "beats": [
+                {
+                    "id": "HOOK",
+                    "status": "covered",
+                    "source": "take",
+                    "range": [0.0, 1.0],
+                }
+            ]
+        },
+        "script_supervisor": {
+            "beat_candidates": [
+                {
+                    "beat": "HOOK",
+                    "candidates": [
+                        {"source": "take", "start": 0.0, "end": 1.0, "quote": oversized}
+                    ],
+                }
+            ]
+        },
+        "word_index": {},
+    }
+
+    with pytest.raises(ValueError, match="A4 prompt for HOOK"):
+        _budgeted_a4_context(base, "cut", beat="HOOK")
 
 
 def _state(edit_dir: Path, source: Path) -> None:
