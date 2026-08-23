@@ -121,6 +121,20 @@ Autonomy does not remove editorial ownership. The system produces two variants f
 
 ## 6. Five-minute judging plan
 
+### 60-second technical voice-over
+
+Use these lines over the prepared product video. They keep the autonomous reasoning claim visible without expanding the scope beyond what the implementation can prove:
+
+- You start with a canvas where you can add ideas, videos, design assets, or anything else that comes to mind.
+- Three agents improve the direction, business value, and creative suggestions via the Devin API.
+- A decision agent runs a short reasoning loop: it analyzes the suggestions, resolves conflicts, makes editing decisions, and delegates them to specialized cutter agents.
+- FFmpeg and Remotion create clean cuts and motion graphics.
+- Our quality-control agents check for errors before and after rendering.
+- After a few minutes, you can choose between two versions of each video section. Devin recommends the best valid option with the fewest technical issues.
+- We use Entire to preserve development context, track decisions, and help agents resume work without losing knowledge.
+
+The proof behind the wording is compact: A1/A2/A3 supply analysis, direction, and challenge; A4 validates and may revise one decision before delegating beat-local variants; A5 recommends only after previews and technical evidence exist; local measurements and A7 guard the render. Entire describes the development workflow, not the runtime video pipeline.
+
 ### 0:00–0:35 — Problem and hook
 
 “An editor can only cut what you recorded. If your traction proof or product demo is missing, AI clipping tools discover the problem too late. COGNIFRAME is the autonomous Devin director that finds the missing shot while you can still record it.”
@@ -147,6 +161,8 @@ Show live role statuses and one session URL. Focus on A4's state transition:
 - accepted corrected plan.
 
 Do not show a wall of prompts. Show the before/after manifest and the fact that the system, not a presenter, decided whether work could advance.
+
+Use the memorable summary: “Analyze, challenge, decide, then delegate.”
 
 ### 2:10–3:05 — Product reveal
 
@@ -235,7 +251,7 @@ No. The external pack is supplied locally and is not redistributed. COGNIFRAME s
 
 ## 9. Entire development trail
 
-At documentation audit time, `entire checkpoint list` reported 25 checkpoints on `main`. The most relevant canonical checkpoints are:
+`entire checkpoint list` shows a persistent history on `main`, including conversational and commit-backed checkpoints. The most relevant canonical commit checkpoints are:
 
 - `01M0PBFZNVRKHRYEQKEJS2AC9W` — A4 prompt budget, motion overlay QC, and safe environment launchers;
 - `01M0PD430R24XK43W30XZT642Y` — bounded Devin reasoning, motion pacing, and subtitle suppression;

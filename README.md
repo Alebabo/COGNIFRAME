@@ -107,6 +107,18 @@ Autonomy is bounded by local evidence:
 
 This is an autonomous layer rather than a sequence of prompts: Devin proposes and revises state; the orchestrator decides what may advance; executable media tooling realizes the accepted state.
 
+### 60-second technical walkthrough
+
+- You start with a canvas where you can add ideas, videos, design assets, or anything else that comes to mind.
+- Three agents improve the direction, business value, and creative suggestions via the Devin API.
+- A decision agent runs a short reasoning loop: it analyzes the suggestions, resolves conflicts, makes editing decisions, and delegates them to specialized cutter agents.
+- FFmpeg and Remotion create clean cuts and motion graphics.
+- Our quality-control agents check for errors before and after rendering.
+- After a few minutes, you can choose between two versions of each video section. Devin recommends the best valid option with the fewest technical issues.
+- We use Entire to preserve development context, track decisions, and help agents resume work without losing knowledge.
+
+The short description maps to the implementation rather than hiding detail: A1, A2, and A3 provide the analysis and challenge stage; A4 performs the bounded decision-and-repair loop and delegates beat-local variant work; deterministic media checks plus A7 provide quality control; A5 makes the non-blocking variant recommendation.
+
 For the full challenge-to-evidence mapping and the five-minute judging plan, see [docs/cognition-challenge.md](docs/cognition-challenge.md). The implementation-level flow is in [docs/architecture.md](docs/architecture.md), and motion safety is documented in [docs/motion-pack.md](docs/motion-pack.md).
 
 ## Safety and quality controls

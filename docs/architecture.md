@@ -82,11 +82,16 @@ transcription; it is not an agent backend.
 
 The word *autonomous* refers to bounded state transitions, not an unrestricted loop:
 
-1. a Devin role proposes structured state;
-2. JSON Schema validates its shape;
-3. deterministic domain checks decide whether it may advance;
-4. A4 alone may receive one semantic correction message in the same session;
-5. the revised output either passes or stops the workflow.
+1. A1, A2, and A3 analyze the material, improve direction and business value, and challenge weak claims;
+2. deterministic conflict rules resolve their suggestions into an authoritative brief;
+3. A4 converts that brief into structured editing decisions and delegates beat-local work to the variant cutters;
+4. JSON Schema and deterministic domain checks decide whether the result may advance;
+5. A4 alone may receive one semantic correction message in the same session;
+6. the revised output either passes or stops the workflow.
+
+In the short pitch this is summarized as: **analyze, challenge, decide, then delegate**. It is a
+bounded reasoning loop with inspectable inputs, findings, and output—not a claim of unrestricted
+agent planning.
 
 Schema-invalid output may be retried once in a fresh session with the schema error in context.
 Timeout retry is also capped at one and terminates the timed-out session. `sessions.json` records
