@@ -1,0 +1,81 @@
+{
+  "cli_version": "0.10.2",
+  "checkpoint_id": "01M0P32NA3PZ0N8KP6D43BWCY7",
+  "session_id": "01a02c25-aee5-7211-9950-8b7576246b0f",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-23T01:23:40.7165583Z",
+  "branch": "codex/unified-palantum",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "palantum/agents/prompts/a6_graphics_director.md",
+    "palantum/engine/render_bridge.py",
+    "palantum/orchestrator.py",
+    "palantum/schemas/roles.json",
+    "tests/test_chunks.py",
+    "tests/test_orchestrator_motion.py",
+    "tests/test_render_bridge.py"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.6-sol",
+  "turn_id": "e7d1f6fb37b7",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 271137,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 6921294,
+    "output_tokens": 31264,
+    "api_call_count": 61
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-23T01:23:40.5670833Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 1307,
+    "human_removed": 1442,
+    "total_committed": 117,
+    "total_lines_changed": 2749,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1670,
+      "user_lines_removed": 1493,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "palantum/agents/prompts/a6_graphics_director.md": 5,
+        "palantum/engine/render_bridge.py": 16,
+        "palantum/orchestrator.py": 1147,
+        "palantum/schemas/roles.json": 197,
+        "scripts/make_fixtures.py": 192,
+        "scripts/setup_engine.sh": 3,
+        "tests/test_chunks.py": 22,
+        "tests/test_orchestrator_motion.py": 70,
+        "tests/test_render_bridge.py": 18
+      },
+      "user_removed_per_file": {
+        "palantum/agents/prompts/a6_graphics_director.md": 1,
+        "palantum/orchestrator.py": 1090,
+        "palantum/schemas/roles.json": 197,
+        "scripts/make_fixtures.py": 192,
+        "scripts/setup_engine.sh": 3,
+        "tests/test_chunks.py": 2,
+        "tests/test_orchestrator_motion.py": 8
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1670,
+      "agent_lines_removed": 1493
+    }
+  ]
+}
