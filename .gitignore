@@ -9,3 +9,6 @@ __pycache__/
 edit/
 fixtures/
 palantum/web/static/sample.mp4
+.env
+.env.*
+!.env.example

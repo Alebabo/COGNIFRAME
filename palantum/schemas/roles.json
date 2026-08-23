@@ -199,6 +199,15 @@
       "notes": { "type": "string" }
     }
   },
+  "A5": {
+    "type": "object",
+    "required": ["variant_id", "reason"],
+    "additionalProperties": false,
+    "properties": {
+      "variant_id": { "type": "string", "enum": ["a", "b"] },
+      "reason": { "type": "string", "minLength": 1 }
+    }
+  },
   "A6": {
     "type": "object",
     "required": ["overlays"],

@@ -74,8 +74,8 @@ def run_role(
     """Run one role with one backend, validating and retrying once."""
     selected = schema or _schema(role_id)
     backend = os.getenv("PALANTUM_AGENT_BACKEND", "devin").lower()
-    if backend not in {"devin", "openai"}:
-        raise ValueError(f"unsupported PALANTUM_AGENT_BACKEND={backend}")
+    if backend != "devin":
+        raise ValueError("Palantum agent roles require the Devin backend")
 
     last_error = ""
     session_url: str | None = None
@@ -85,28 +85,23 @@ def run_role(
         if last_error:
             attempt_context["_validation_error"] = last_error
         try:
-            if backend == "devin":
-                from palantum.agents.backends.devin import call as call_devin
+            from palantum.agents.backends.devin import call as call_devin
 
-                def session_created(_session_id: str, url: str) -> None:
-                    nonlocal session_url
-                    session_url = url
-                    _record_session(context, role_id, "running", url)
+            def session_created(_session_id: str, url: str) -> None:
+                nonlocal session_url
+                session_url = url
+                _record_session(context, role_id, "running", url)
 
-                result = call_devin(
-                    role_id,
-                    prompt,
-                    attempt_context,
-                    selected,
-                    attempt=attempt,
-                    on_session_created=session_created,
-                )
-                output = result.output
-                session_url = result.url
-            else:
-                from palantum.agents.backends.openai import call as call_openai
-
-                output = call_openai(role_id, prompt, attempt_context, selected, attempt=attempt)
+            result = call_devin(
+                role_id,
+                prompt,
+                attempt_context,
+                selected,
+                attempt=attempt,
+                on_session_created=session_created,
+            )
+            output = result.output
+            session_url = result.url
         except Exception:
             _record_session(context, role_id, "failed", session_url)
             raise

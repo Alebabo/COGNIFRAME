@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
@@ -71,6 +72,7 @@ def _prompt(role_id: str) -> str:
         "A2": "a2_director",
         "A3": "a3_strategist",
         "A4": "a4_cutter",
+        "A5": "a5_variant_supervisor",
         "A6": "a6_graphics_director",
         "A6W": "a6_slot_worker",
         "A7": "a7_qc",
@@ -97,6 +99,17 @@ def _probe_context(result: ProbeResult) -> dict[str, Any]:
         "fps": result.fps,
         "has_audio": result.has_audio,
         "streams": result.streams,
+    }
+
+
+def _file_free_probe_context(result: ProbeResult) -> dict[str, Any]:
+    """Return compact render measurements without exposing a filesystem path."""
+    return {
+        "duration_s": result.duration_s,
+        "width": result.width,
+        "height": result.height,
+        "fps": result.fps,
+        "has_audio": result.has_audio,
     }
 
 
@@ -836,7 +849,9 @@ def _build_chunk_variant(
     )
     ranges = _validate_chunk_ranges(chunk, decision["ranges"], source_map)
     overlays: list[dict[str, Any]] = []
-    if bool(variant["motion"]) and motion_source is not None:
+    if bool(variant["motion"]):
+        if motion_source is None:
+            raise RuntimeError("the motion variant requires a configured template source")
         overlays = _graphics_overlays(
             variant_dir,
             state,
@@ -847,6 +862,10 @@ def _build_chunk_variant(
             approved_catalog=approved_catalog,
             required_overlays=1,
         )
+        if len(overlays) != 1:
+            raise RuntimeError(
+                f"the motion variant requires exactly one overlay, got {len(overlays)}"
+            )
     _copy_chunk_transcripts(edit_dir, variant_dir, ranges)
     preview_edl = {
         "sources": source_map,
@@ -881,10 +900,135 @@ def _build_chunk_variant(
         "status": "ready",
         "duration_s": measured.duration_s,
         "expected_duration_s": duration,
+        "probe": _file_free_probe_context(measured),
         "ranges": ranges,
         "overlays": final_overlays,
         "preview": preview.relative_to(edit_dir).as_posix(),
         "notes": str(decision.get("notes", "")),
+    }
+
+
+def _variant_supervisor_context(
+    chunk: dict[str, Any], variants: list[dict[str, Any]], base_context: dict[str, Any]
+) -> dict[str, Any]:
+    """Build a compact, file-free comparison payload for the optional A5 review."""
+    comparable = []
+    for variant in variants:
+        comparable.append(
+            {
+                "id": str(variant["id"]),
+                "name": str(variant.get("name", "")),
+                "strategy": str(variant.get("strategy", "")),
+                "duration_s": float(variant.get("duration_s", 0)),
+                "expected_duration_s": float(variant.get("expected_duration_s", 0)),
+                "probe": (
+                    dict(variant["probe"])
+                    if isinstance(variant.get("probe"), dict)
+                    else {}
+                ),
+                "ranges": [
+                    {
+                        "source": str(item.get("source", "")),
+                        "start": float(item.get("start", 0)),
+                        "end": float(item.get("end", 0)),
+                        "quote": str(item.get("quote", "")),
+                        "reason": str(item.get("reason", "")),
+                    }
+                    for item in variant.get("ranges", [])
+                    if isinstance(item, dict)
+                ],
+                "overlays": [
+                    {
+                        "template_id": str(item.get("template_id", "")),
+                        "beat": str(item.get("beat", "")),
+                        "duration": float(item.get("duration", 0)),
+                        "reason": str(item.get("reason", "")),
+                    }
+                    for item in variant.get("overlays", [])
+                    if isinstance(item, dict)
+                ],
+                "notes": str(variant.get("notes", "")),
+            }
+        )
+    return {
+        "run_number": base_context["run_number"],
+        "_session_state_path": base_context["_session_state_path"],
+        "_session_key": ".".join(
+            filter(
+                None,
+                (
+                    str(base_context.get("_manifest_generation", "")),
+                    str(chunk["id"]),
+                    "recommendation",
+                ),
+            )
+        ),
+        "chunk": {
+            "id": str(chunk["id"]),
+            "beat": str(chunk["beat"]),
+            "variants": comparable,
+        },
+    }
+
+
+def _recommend_chunk_variant(
+    edit_dir: Path,
+    chunk: dict[str, Any],
+    variants: list[dict[str, Any]],
+    base_context: dict[str, Any],
+    *,
+    resume: bool,
+) -> dict[str, Any]:
+    """Ask A5 for a preference without making review depend on agent availability."""
+    try:
+        generation = str(base_context.get("_manifest_generation", ""))
+        cache_key = "-".join(filter(None, ("A5", generation, str(chunk["id"]))))
+        recommendation = _cached_role(
+            edit_dir,
+            cache_key,
+            "A5",
+            _prompt("A5"),
+            _variant_supervisor_context(chunk, variants, base_context),
+            resume=resume,
+        )
+        variant_id = str(recommendation["variant_id"])
+        if variant_id not in {str(item["id"]) for item in variants}:
+            raise ValueError(f"A5 selected unknown variant {variant_id}")
+        return {
+            "status": "ready",
+            "variant_id": variant_id,
+            "reason": str(recommendation["reason"]),
+        }
+    except Exception:
+        return {
+            "status": "unavailable",
+            "variant_id": None,
+            "reason": "Die KI-Empfehlung ist derzeit nicht verfügbar.",
+        }
+
+
+def _chunk_base_context(
+    edit_dir: Path, state: dict[str, Any], *, manifest_generation: str = ""
+) -> dict[str, Any]:
+    supervisor_path = edit_dir / "script-supervisor.json"
+    director_path = edit_dir / "director.json"
+    director = (
+        _read_json(director_path)
+        if director_path.exists()
+        else {
+            "beats": state["beats"],
+            "beat_order": [beat["id"] for beat in state["beats"]],
+        }
+    )
+    return {
+        "run_number": int(state["meta"]["iteration"]),
+        "_session_state_path": str(edit_dir / "sessions.json"),
+        "_manifest_generation": manifest_generation,
+        "schema": _schema(),
+        "director": director,
+        "script_supervisor": _read_json(supervisor_path) if supervisor_path.exists() else {},
+        "takes_packed": (edit_dir / "takes_packed.md").read_text(encoding="utf-8"),
+        "word_index": _read_json(edit_dir / "word_index.json"),
     }
 
 
@@ -900,25 +1044,10 @@ def build_chunk_variants(
     state = load(edit_dir, schema)
     if not sources:
         raise RuntimeError("no source videos available for chunking")
-    supervisor_path = edit_dir / "script-supervisor.json"
-    director_path = edit_dir / "director.json"
-    director = (
-        _read_json(director_path)
-        if director_path.exists()
-        else {
-            "beats": state["beats"],
-            "beat_order": [beat["id"] for beat in state["beats"]],
-        }
+    generation = uuid.uuid4().hex
+    base_context = _chunk_base_context(
+        edit_dir, state, manifest_generation=generation
     )
-    base_context = {
-        "run_number": int(state["meta"]["iteration"]),
-        "_session_state_path": str(edit_dir / "sessions.json"),
-        "schema": schema,
-        "director": director,
-        "script_supervisor": _read_json(supervisor_path) if supervisor_path.exists() else {},
-        "takes_packed": (edit_dir / "takes_packed.md").read_text(encoding="utf-8"),
-        "word_index": _read_json(edit_dir / "word_index.json"),
-    }
     chunk_plan = _cached_role(
         edit_dir,
         "A4-chunk-plan",
@@ -934,13 +1063,20 @@ def build_chunk_variants(
     first_source = probe(sources[0])
     target_size = (1080, 1920) if first_source.height > first_source.width else (1920, 1080)
     motion_source = _motion_source(template_source, state)
+    if motion_source is None:
+        raise RuntimeError(
+            "PALANTUM_TEMPLATE_SOURCE fehlt; Variante B benötigt genau eine "
+            "validierte Motion Graphic."
+        )
     catalog_path = edit_dir / "scene-catalog.json"
     approved_catalog = (
         _read_json(catalog_path) if motion_source is not None and catalog_path.exists() else None
     )
     manifest: dict[str, Any] = {
         "version": 1,
+        "generation_id": generation,
         "status": "building",
+        "recommendations_status": "pending",
         "sources": source_map,
         "chunks": [
             {
@@ -979,6 +1115,33 @@ def build_chunk_variants(
     manifest["status"] = "review"
     _write_json(edit_dir / "chunks.json", manifest)
     return manifest
+
+
+def recommend_chunk_variants(
+    edit_dir: Path, manifest: dict[str, Any], *, resume: bool = False
+) -> dict[str, dict[str, Any]]:
+    """Compute optional A5 recommendations without mutating the chunk manifest."""
+    chunks = [item for item in manifest.get("chunks", []) if isinstance(item, dict)]
+    if not chunks:
+        return {}
+    generation = str(manifest.get("generation_id", ""))
+    state = load(edit_dir, _schema())
+    base_context = _chunk_base_context(
+        edit_dir, state, manifest_generation=generation
+    )
+    with ThreadPoolExecutor(max_workers=min(4, len(chunks))) as executor:
+        pending = {
+            str(chunk["id"]): executor.submit(
+                _recommend_chunk_variant,
+                edit_dir,
+                chunk,
+                chunk.get("variants", []),
+                base_context,
+                resume=resume,
+            )
+            for chunk in chunks
+        }
+        return {chunk_id: future.result() for chunk_id, future in pending.items()}
 
 
 def finalize_chunk_variants(edit_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:

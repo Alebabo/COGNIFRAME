@@ -14,6 +14,11 @@
       "order": 0,
       "beat": "HOOK",
       "selected": "a",
+      "recommendation": {
+        "status": "ready",
+        "variant_id": "b",
+        "reason": "Die Motion-Fassung setzt den Einstieg präziser und technisch sauber um."
+      },
       "variants": [
         {
           "id": "a",
@@ -36,6 +41,11 @@
       "order": 1,
       "beat": "SOLUTION",
       "selected": null,
+      "recommendation": {
+        "status": "unavailable",
+        "variant_id": null,
+        "reason": "Die KI-Empfehlung ist derzeit nicht verfügbar."
+      },
       "variants": [
         {
           "id": "a",

@@ -1,19 +1,10 @@
 from __future__ import annotations
 
-import base64
 import json
-import os
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import TypedDict, cast
-
-from openai import OpenAI
-from openai.types.chat import (
-    ChatCompletionContentPartImageParam,
-    ChatCompletionContentPartTextParam,
-    ChatCompletionUserMessageParam,
-)
 
 from palantum.engine.videouse import probe
 
@@ -61,64 +52,22 @@ def _frame(source: Path, timestamp: float, output: Path) -> None:
 
 
 def _classify(frames: list[Path]) -> VisualBlock:
-    content: list[ChatCompletionContentPartTextParam | ChatCompletionContentPartImageParam] = [
-        ChatCompletionContentPartTextParam(
-            type="text",
-            text=(
-                "Classify the video frames as one of talking_head, screen_recording, "
-                "b_roll, slate, or unknown. Return has_ui=true only when a product "
-                "interface is visibly present. Give one concise sentence describing "
-                "the frames."
-            ),
-        )
-    ]
-    for frame in frames:
-        encoded = base64.b64encode(frame.read_bytes()).decode("ascii")
-        content.append(
-            ChatCompletionContentPartImageParam(
-                type="image_url",
-                image_url={"url": f"data:image/png;base64,{encoded}"},
-            )
-        )
-    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-    response = client.chat.completions.create(
-        model=os.getenv("PALANTUM_VISION_MODEL", "gpt-4o-mini"),
-        messages=[ChatCompletionUserMessageParam(role="user", content=content)],
-        temperature=0,
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "palantum_visual_classification",
-                "strict": True,
-                "schema": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": ["kind", "has_ui", "description"],
-                    "properties": {
-                        "kind": {
-                            "type": "string",
-                            "enum": [
-                                "talking_head",
-                                "screen_recording",
-                                "b_roll",
-                                "slate",
-                                "unknown",
-                            ],
-                        },
-                        "has_ui": {"type": "boolean"},
-                        "description": {"type": "string"},
-                    },
-                },
-            },
-        },
-    )
-    message = response.choices[0].message.content
-    if not message:
-        raise ValueError("vision model returned an empty response")
-    result = json.loads(message)
-    if not isinstance(result, dict):
-        raise ValueError("vision model returned a non-object response")
-    return cast(VisualBlock, result)
+    """Return a conservative local result until a local vision model is configured.
+
+    OpenAI is intentionally reserved for Whisper transcription.  Extracting the
+    frames still verifies that the media can be decoded and leaves a stable cache
+    point for a future local classifier without inventing visual semantics.
+    """
+    if not frames or any(not frame.is_file() or frame.stat().st_size == 0 for frame in frames):
+        raise ValueError("visual frame extraction produced no usable frames")
+    return {
+        "kind": "unknown",
+        "has_ui": False,
+        "description": (
+            "Lokale Frames wurden extrahiert; eine semantische "
+            "Bildklassifizierung ist nicht aktiviert."
+        ),
+    }
 
 
 def classify_visual(source: Path, edit_dir: Path, frame_count: int = 5) -> VisualBlock:
