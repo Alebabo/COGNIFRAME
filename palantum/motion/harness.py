@@ -122,7 +122,7 @@ def materialize_scene(
     if target_width <= 0 or target_height <= 0:
         raise ValueError("target dimensions must be positive")
     resolved_presentation = presentation or str(scene.get("presentation", "overlay"))
-    if resolved_presentation not in {"overlay", "inset"}:
+    if resolved_presentation not in {"overlay", "inset", "fullscreen"}:
         raise ValueError(f"unsupported scene presentation: {resolved_presentation}")
     scale = min(target_width / scene_width, target_height / scene_height)
     if resolved_presentation == "inset":
